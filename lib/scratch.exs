@@ -26,7 +26,9 @@ to_string_ns = NodeSpec.from_cps1(Cps.to_cps1(&to_string(&1)),
 
 g = GraphSpec.new(inputs: [gin: Number], outputs: [gout: String])
 g = GraphSpec.add_nodes(g, squarer: square_ns, stringer: to_string_ns)
-g = GraphSpec.connect(g, {:squarer, :r}, {:stringer, :x})
-g = GraphSpec.connect(g, :gin, {:squarer, :x})
-g = GraphSpec.connect(g, {:stringer, :s}, :gout)
-
+GraphSpec.connect_many(g) do
+  squarer.r -> stringer.x
+  gin -> squarer.x
+  stringer.s -> gout
+end
+GraphSpec.to_dot(g, "d")

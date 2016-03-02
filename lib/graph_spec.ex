@@ -15,6 +15,20 @@ defmodule GraphSpec do
     %GraphSpec{g | edges: [{src_port, dst_port}|g.edges]}
   end
 
+  defmacro connect_many(g, [do: edges]) do
+    quote do
+      unquote_splicing(
+        Enum.map edges, fn {:->, _, [[src], dst]} ->
+          quote do
+            unquote(g) = GraphSpec.connect(unquote(g), unquote(fqport(src)), unquote(fqport(dst)))
+          end
+        end)
+    end
+  end
+
+  defp fqport({{:., _, [{name, _, _}, port]}, _, _}), do: {name, port}
+  defp fqport({name, _, _}), do: name
+  
   def to_dot(g, name) do
     file = File.open!(name <> ".dot", [:write])
     IO.puts(file, "digraph {")
