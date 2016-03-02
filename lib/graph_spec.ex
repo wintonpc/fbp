@@ -19,23 +19,20 @@ defmodule GraphSpec do
 
   defmacro defnode({name, _, [kws]}, [do: body]) do
     {[returns: outputs], inputs} = Enum.partition(kws, fn {k, _} -> k == :returns end)
+    params = Enum.map(inputs, &{elem(&1, 0), [], nil})
     quote do
       def unquote({name, [], nil}) do
-        NodeSpec.from_cps1(Cps.to_cps1(&(&1)),
+        NodeSpec.from_cps1(Cps.to_cps1(fn unquote_splicing(params) -> unquote(body) end),
                            inputs: unquote(inputs),
                            outputs: unquote(outputs))
       end
     end
   end
   
-  defmacro connect_many(g, [do: edges]) do
+  defmacro connect_many(g, [do: []]), do: g
+  defmacro connect_many(g, [do: [{:->, _, [[src], dst]}|rest]]) do
     quote do
-      unquote_splicing(
-        Enum.map edges, fn {:->, _, [[src], dst]} ->
-          quote do
-            unquote(g) = GraphSpec.connect(unquote(g), unquote(fqport(src)), unquote(fqport(dst)))
-          end
-        end)
+      connect_many(GraphSpec.connect(unquote(g), unquote(fqport(src)), unquote(fqport(dst))), do: unquote(rest))
     end
   end
 
@@ -55,21 +52,34 @@ defmodule GraphSpec do
     IO.puts(file, "}")
 
     Enum.each g.edges, fn {src, dst} ->
+      IO.puts inspect({src, dst})
       case {src, dst} do
         {{src_name, src_port}, {dst_name, dst_port}} ->
-          type = g.nodes[src_name].outputs[src_port]
+          type = output_type(g, src_name, src_port)
           draw_edge(file, g, type, src_name, src_port, dst_name, dst_port)
         {ext_name, {int_name, int_port}} ->
-          type = g.nodes[int_name].inputs[int_port]
+          type = input_type(g, int_name, int_port)
           draw_edge(file, g, type, ext_name, nil, int_name, int_port)
         {{int_name, int_port}, ext_name} ->
-          type = g.nodes[int_name].outputs[int_port]
+          type = output_type(g, int_name, int_port)
           draw_edge(file, g, type, int_name, int_port, ext_name, nil)
       end
     end
     
     IO.puts(file, "}")
     File.close(file)
+  end
+
+  defp input_type(g, node_name, port_name) do
+    find_node(g, node_name) |> NodeSpec.find_input(port_name)
+  end
+
+  defp output_type(g, node_name, port_name) do
+    find_node(g, node_name) |> NodeSpec.find_output(port_name)
+  end
+  
+  defp find_node(g, name) do
+    Keyword.fetch!(g.nodes, name)
   end
 
   defp draw_edge(file, g, type, sn, sl, dn, dl) do
