@@ -45,22 +45,23 @@ defmodule GraphSpec do
       case {src, dst} do
         {{src_name, src_port}, {dst_name, dst_port}} ->
           type = g.nodes[src_name].outputs[src_port]
-          type_string = List.last(Module.split(type))
-          IO.puts(file, "#{dot_edge(src_name, dst_name)} [label=\"#{type_string}\", taillabel=\"#{src_port}\", headlabel=\"#{dst_port}\"]")
+          draw_edge(file, g, type, src_name, src_port, dst_name, dst_port)
         {ext_name, {int_name, int_port}} ->
           type = g.nodes[int_name].inputs[int_port]
-          type_string = List.last(Module.split(type))
-          IO.puts(file, "#{dot_edge(ext_name, int_name)} [label=\"#{type_string}\", headlabel=\"#{int_port}\"]")
+          draw_edge(file, g, type, ext_name, nil, int_name, int_port)
         {{int_name, int_port}, ext_name} ->
           type = g.nodes[int_name].outputs[int_port]
-          type_string = List.last(Module.split(type))
-          IO.puts(file, "#{dot_edge(int_name, ext_name)} [label=\"#{type_string}\", taillabel=\"#{int_port}\"]")
-        _ -> :ok
+          draw_edge(file, g, type, int_name, int_port, ext_name, nil)
       end
     end
     
     IO.puts(file, "}")
     File.close(file)
+  end
+
+  defp draw_edge(file, g, type, sn, sl, dn, dl) do
+    type_string = List.last(Module.split(type))
+    IO.puts(file, "#{dot_edge(sn, dn)} [label=\"#{type_string}\", taillabel=\"#{sl}\", headlabel=\"#{dl}\"]")
   end
 
   defp dot_edge(src, dst) do
