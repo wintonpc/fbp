@@ -15,6 +15,19 @@ defmodule GraphSpec do
     %GraphSpec{g | edges: [{src_port, dst_port}|g.edges]}
   end
 
+  ############################################################
+
+  defmacro defnode({name, _, [kws]}, [do: body]) do
+    {[returns: outputs], inputs} = Enum.partition(kws, fn {k, _} -> k == :returns end)
+    quote do
+      def unquote({name, [], nil}) do
+        NodeSpec.from_cps1(Cps.to_cps1(&(&1)),
+                           inputs: unquote(inputs),
+                           outputs: unquote(outputs))
+      end
+    end
+  end
+  
   defmacro connect_many(g, [do: edges]) do
     quote do
       unquote_splicing(

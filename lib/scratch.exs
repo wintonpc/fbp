@@ -24,6 +24,19 @@ to_string_ns = NodeSpec.from_cps1(Cps.to_cps1(&to_string(&1)),
                                   inputs: [x: Any],
                                   outputs: [s: String])
 
+quote do
+  defnode squarer(x: Number, returns: [r: Number]) do
+    x * x
+  end
+end
+
+Macro.expand_once(quote do
+                   defnode squarer(x: Number, returns: [r: Number]) do
+                     x * x
+                   end
+end)
+
+
 g = GraphSpec.new(inputs: [gin: Number], outputs: [gout: String])
 g = GraphSpec.add_nodes(g, squarer: square_ns, stringer: to_string_ns)
 GraphSpec.connect_many(g) do
