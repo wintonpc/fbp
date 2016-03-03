@@ -22,6 +22,7 @@ defmodule ModPeak do
     Compute.manually_integrate(chrom_in, time_range)
   end
 
+  # modifies a peak
   def mod_peak do
     GraphSpec.new(
       inputs:  [chrom_in: Chromatogram, time_range: Range],
@@ -34,6 +35,9 @@ defmodule ModPeak do
       end)
   end
 
+  # fetches a chromatogram from the database,
+  # modifies its peak, and
+  # saves it back to the database
   def db_mod_peak do
     GraphSpec.new(
       inputs:  [chrom_id_in: ChromatogramId, time_range: Range],

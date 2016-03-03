@@ -20,7 +20,6 @@ defmodule GraphSpec.Dot do
 
     IO.puts(file, "subgraph cluster0 {")
     for {name, _} <- g.nodes, do: IO.puts(file, to_string(name))
-    IO.puts(file, "}")
 
     Enum.each g.edges, fn {src, dst} ->
       case {src, dst} do
@@ -35,6 +34,9 @@ defmodule GraphSpec.Dot do
           draw_edge(file, g, type, int_name, int_port, ext_name, nil, show_ports)
       end
     end
+
+    IO.puts(file, "}")
+        
     
     IO.puts(file, "}")
     File.close(file)
