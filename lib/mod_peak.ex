@@ -6,15 +6,15 @@ defstruct2 Trace, [x, y]
 defstruct2 Peak, []
 defstruct2 Range, [a, b]
 
-defmodule ModPeakNodeSpecs do
+defmodule ModPeak do
   import GraphSpec
   
-  defnode fetch_chromatogram(i: ChromatogramId, returns: [o: Chromatogram]) do
-    
+  defnode fetch_chromatogram(chrom_id: ChromatogramId, returns: [chrom: Chromatogram]) do
+    DB.fetch_chromatogram(chrom_id)
   end
 
-  defnode save_chromatogram(i: Chromatogram, returns: [o: ChromatogramId]) do
-    
+  defnode save_chromatogram(chrom: Chromatogram, returns: [chrom_id: ChromatogramId]) do
+    DB.save_chromatogram(chrom)
   end
 
   defnode manually_integrate(chrom_in: Chromatogram, time_range: Range, returns: [chrom_out: Chromatogram]) do
@@ -27,9 +27,9 @@ defmodule ModPeakNodeSpecs do
                                chrom_in: Chromatogram],
                       outputs: [chrom_out: Chromatogram])
 
-    g = GraphSpec.add_nodes(g, integrator: manually_integrate)
+    g = add_nodes(g, integrator: manually_integrate)
 
-    g = GraphSpec.connect_many(g) do
+    g = connect_many(g) do
       time_range -> integrator.time_range
       chrom_in -> integrator.chrom_in
       integrator.chrom_out -> chrom_out
@@ -42,13 +42,13 @@ defmodule ModPeakNodeSpecs do
     g = GraphSpec.new(inputs: [time_range: Range,
                                chrom_id_in: ChromatogramId],
                       outputs: [chrom_id_out: ChromatogramId])
+    
+    g = add_nodes(g,
+                  fetcher: fetch_chromatogram,
+                  modifier: mod_peak,
+                  saver: save_chromatogram)
 
-    g = GraphSpec.add_nodes(g,
-                            fetcher: fetch_chromatogram,
-                            modifier: mod_peak,
-                            saver: save_chromatogram)
-
-    g = GraphSpec.connect_many(g) do
+    g = connect_many(g) do
       chrom_id_in -> fetcher.i
       time_range -> modifier.time_range
       fetcher.o -> modifier.chrom_in
