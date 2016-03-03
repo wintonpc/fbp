@@ -11,9 +11,7 @@ end
 
 g = GraphSpec.new(inputs: [gin: Number], outputs: [gout: String])
 
-g = GraphSpec.add_nodes(g,
-                        squarer: NodeSpecs.squarer,
-                        stringer: NodeSpecs.stringer)
+g = GraphSpec.add_nodes(g, squarer: NodeSpecs.squarer, stringer: NodeSpecs.stringer)
 
 g = GraphSpec.connect_many(g) do
   gin -> squarer.i
