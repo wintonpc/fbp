@@ -9,12 +9,12 @@ defstruct2 Range, [a, b]
 defmodule ModPeak do
   import GraphSpec
   
-  defnode fetch_chromatogram(chrom_id: ChromatogramId, returns: [chrom: Chromatogram]) do
-    DB.fetch_chromatogram(chrom_id)
+  defnode fetch_chromatogram(inp: ChromatogramId, returns: [outp: Chromatogram]) do
+    DB.fetch_chromatogram(inp)
   end
 
-  defnode save_chromatogram(chrom: Chromatogram, returns: [chrom_id: ChromatogramId]) do
-    DB.save_chromatogram(chrom)
+  defnode save_chromatogram(inp: Chromatogram, returns: [outp: ChromatogramId]) do
+    DB.save_chromatogram(inp)
   end
 
   defnode manually_integrate(chrom_in: Chromatogram, time_range: Range, returns: [chrom_out: Chromatogram]) do
@@ -42,18 +42,13 @@ defmodule ModPeak do
                 modifier: mod_peak,
                 saver: save_chromatogram],
       connections: edges do
-        chrom_id_in -> fetcher.chrom_id
+        chrom_id_in -> fetcher.inp
         time_range -> modifier.time_range
-        fetcher.chrom -> modifier.chrom_in
-        modifier.chrom_out -> saver.chrom
-        saver.chrom_id -> chrom_id_out
+        fetcher.outp -> modifier.chrom_in
+        modifier.chrom_out -> saver.inp
+        saver.outp -> chrom_id_out
       end)
   end
-
-  def render do
-    GraphSpec.render_dot(db_mod_peak, "mod_peak")
-  end
-
 end
 
 

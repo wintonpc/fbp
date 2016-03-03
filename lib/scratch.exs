@@ -20,3 +20,26 @@ g = GraphSpec.connect_many(g) do
 end
 
 GraphSpec.render_dot(g, "d")
+
+GraphSpec.edges do
+  a.x -> b.c
+  q -> p
+end
+
+quote do
+  GraphSpec.edges do
+    a.x -> b.y
+    q -> p
+  end
+end
+
+IO.puts(Macro.to_string(Macro.expand_once(quote do
+                                           GraphSpec.edges do
+                                             a.x -> b.y
+                                             q -> p
+                                           end
+        end, __ENV__)))
+
+IO.puts(Macro.to_string(Macro.expand_once(quote do
+                                           GraphSpec.edges([{:do, [q] -> p}])
+        end, __ENV__)))

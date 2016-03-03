@@ -48,15 +48,16 @@ defmodule GraphSpec do
   defp fqport({{:., _, [{name, _, _}, port]}, _, _}), do: {name, port}
   defp fqport({name, _, _}), do: name
 
-  def render_dot(g, name) do
-    to_dot(g, name)
+  def render_dot(g, name, opts \\ []) do
+    to_dot(g, name, opts)
     {output, 0} = System.cmd("dot", ["-Tpng", "-o", name <> ".png", name <> ".dot"])
     spawn fn ->
       {output, 0} = System.cmd("xdg-open", [name <> ".png"])
     end
   end
   
-  def to_dot(g, name) do
+  def to_dot(g, name, opts \\ []) do
+    show_ports = opts[:show_ports]
     file = File.open!(name <> ".dot", [:write])
     IO.puts(file, "digraph {")
     IO.puts(file, "rankdir=LR")
@@ -74,13 +75,13 @@ defmodule GraphSpec do
       case {src, dst} do
         {{src_name, src_port}, {dst_name, dst_port}} ->
           type = output_type(g, src_name, src_port)
-          draw_edge(file, g, type, src_name, src_port, dst_name, dst_port)
+          draw_edge(file, g, type, src_name, src_port, dst_name, dst_port, show_ports)
         {ext_name, {int_name, int_port}} ->
           type = input_type(g, int_name, int_port)
-          draw_edge(file, g, type, ext_name, nil, int_name, int_port)
+          draw_edge(file, g, type, ext_name, nil, int_name, int_port, show_ports)
         {{int_name, int_port}, ext_name} ->
           type = output_type(g, int_name, int_port)
-          draw_edge(file, g, type, int_name, int_port, ext_name, nil)
+          draw_edge(file, g, type, int_name, int_port, ext_name, nil, show_ports)
       end
     end
     
@@ -100,9 +101,13 @@ defmodule GraphSpec do
     Keyword.fetch!(g.nodes, name)
   end
 
-  defp draw_edge(file, g, type, sn, sl, dn, dl) do
+  defp draw_edge(file, g, type, sn, sl, dn, dl, show_ports) do
     type_string = List.last(Module.split(type))
-    IO.puts(file, "#{dot_edge(sn, dn)} [label=\"#{type_string}\", taillabel=\"#{sl}\", headlabel=\"#{dl}\"]")
+    if show_ports do
+      IO.puts(file, "#{dot_edge(sn, dn)} [label=\"#{type_string}\", taillabel=\"#{sl}\", headlabel=\"#{dl}\"]")
+    else
+      IO.puts(file, "#{dot_edge(sn, dn)} [label=\"#{type_string}\"]")
+    end
   end
 
   defp dot_edge(src, dst) do
