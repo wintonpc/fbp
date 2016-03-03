@@ -23,8 +23,8 @@ defmodule GraphSpec do
     quote do
       def unquote({name, [], nil}) do
         NodeSpec.from_cps1(Cps.to_cps1(fn unquote_splicing(params) -> unquote(body) end),
-                           inputs: unquote(inputs),
-                           outputs: unquote(outputs))
+        inputs: unquote(inputs),
+        outputs: unquote(outputs))
       end
     end
   end
@@ -38,6 +38,14 @@ defmodule GraphSpec do
 
   defp fqport({{:., _, [{name, _, _}, port]}, _, _}), do: {name, port}
   defp fqport({name, _, _}), do: name
+
+  def render_dot(g, name) do
+    to_dot(g, name)
+    {output, 0} = System.cmd("dot", ["-Tpng", "-o", name <> ".png", name <> ".dot"])
+    spawn fn ->
+      {output, 0} = System.cmd("xdg-open", [name <> ".png"])
+    end
+  end
   
   def to_dot(g, name) do
     file = File.open!(name <> ".dot", [:write])

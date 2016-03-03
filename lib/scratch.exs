@@ -1,11 +1,11 @@
 import GraphSpec
 
 defmodule NodeSpecs do
-  defnode squarer(x: Number, returns: [r: Number]) do
-    x * x
+  defnode squarer(i: Number, returns: [o: Number]) do
+    i * i
   end  
-  defnode stringer(x: Any, returns: [r: String]) do
-    to_string(x)
+  defnode stringer(i: Any, returns: [o: String]) do
+    to_string(i)
   end
 end
 
@@ -16,9 +16,9 @@ g = GraphSpec.add_nodes(g,
                         stringer: NodeSpecs.stringer)
 
 g = GraphSpec.connect_many(g) do
-  gin -> squarer.x
-  squarer.r -> stringer.x
-  stringer.r -> gout
+  gin -> squarer.i
+  squarer.o -> stringer.i
+  stringer.o -> gout
 end
 
-GraphSpec.to_dot(g, "d")
+GraphSpec.render_dot(g, "d")
