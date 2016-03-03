@@ -23,44 +23,35 @@ defmodule ModPeak do
   end
 
   def mod_peak do
-    g = GraphSpec.new(inputs: [time_range: Range,
-                               chrom_in: Chromatogram],
-                      outputs: [chrom_out: Chromatogram])
-
-    g = add_nodes(g, integrator: manually_integrate)
-
-    g = connect_many(g) do
-      time_range -> integrator.time_range
-      chrom_in -> integrator.chrom_in
-      integrator.chrom_out -> chrom_out
-    end
-
-    g
+    GraphSpec.new(
+      inputs:  [chrom_in: Chromatogram, time_range: Range],
+      outputs: [chrom_out: Chromatogram],
+      nodes:   [integrator: manually_integrate],
+      connections: edges do
+        time_range -> integrator.time_range
+        chrom_in -> integrator.chrom_in
+        integrator.chrom_out -> chrom_out
+      end)
   end
 
   def db_mod_peak do
-    g = GraphSpec.new(inputs: [time_range: Range,
-                               chrom_id_in: ChromatogramId],
-                      outputs: [chrom_id_out: ChromatogramId])
-    
-    g = add_nodes(g,
-                  fetcher: fetch_chromatogram,
-                  modifier: mod_peak,
-                  saver: save_chromatogram)
-
-    g = connect_many(g) do
-      chrom_id_in -> fetcher.i
-      time_range -> modifier.time_range
-      fetcher.o -> modifier.chrom_in
-      modifier.chrom_out -> saver.i
-      saver.o -> chrom_id_out
-    end
-    
-    g
+    GraphSpec.new(
+      inputs:  [chrom_id_in: ChromatogramId, time_range: Range],
+      outputs: [chrom_id_out: ChromatogramId],
+      nodes:   [fetcher: fetch_chromatogram,
+                modifier: mod_peak,
+                saver: save_chromatogram],
+      connections: edges do
+        chrom_id_in -> fetcher.chrom_id
+        time_range -> modifier.time_range
+        fetcher.chrom -> modifier.chrom_in
+        modifier.chrom_out -> saver.chrom
+        saver.chrom_id -> chrom_id_out
+      end)
   end
 
   def render do
-    GraphSpec.render_dot(mod_peak, "mod_peak")
+    GraphSpec.render_dot(db_mod_peak, "mod_peak")
   end
 
 end

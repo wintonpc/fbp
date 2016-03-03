@@ -4,7 +4,10 @@ defmodule GraphSpec do
   def new(opts \\ []) do
     inputs = opts[:inputs] || []
     outputs = opts[:outputs] || []
-    %GraphSpec{nodes: [], edges: [], inputs: inputs, outputs: outputs}
+    nodes = opts[:nodes] || []
+    connections = opts[:connections] || []
+    g = %GraphSpec{nodes: [], edges: connections, inputs: inputs, outputs: outputs}
+    add_nodes(g, nodes)
   end
 
   def add_nodes(g, node_specs) do
@@ -36,6 +39,12 @@ defmodule GraphSpec do
     end
   end
 
+  defmacro edges([do: es]) do
+    Enum.map es, fn {:->, _, [[src], dst]} ->
+      {fqport(src), fqport(dst)}
+    end
+  end
+
   defp fqport({{:., _, [{name, _, _}, port]}, _, _}), do: {name, port}
   defp fqport({name, _, _}), do: name
 
@@ -51,6 +60,8 @@ defmodule GraphSpec do
     file = File.open!(name <> ".dot", [:write])
     IO.puts(file, "digraph {")
     IO.puts(file, "rankdir=LR")
+    IO.puts(file, "node [fontname=\"Bitstream Vera Sans\", fontsize=12]")
+    IO.puts(file, "edge [fontname=\"Bitstream Vera Sans\", fontsize=8]")
 
     for {name, _} <- g.inputs, do: IO.puts(file, "#{name} [color=\"white\"]")
     for {name, _} <- g.outputs, do: IO.puts(file, "#{name} [color=\"white\"]")
