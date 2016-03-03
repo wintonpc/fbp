@@ -60,7 +60,6 @@ defmodule GraphSpec do
     IO.puts(file, "}")
 
     Enum.each g.edges, fn {src, dst} ->
-      IO.puts inspect({src, dst})
       case {src, dst} do
         {{src_name, src_port}, {dst_name, dst_port}} ->
           type = output_type(g, src_name, src_port)
