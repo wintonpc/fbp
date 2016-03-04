@@ -10,16 +10,16 @@ defmodule ModPeak do
   import GraphSpec
   
   defnode fetch_chromatogram(inp: ChromatogramId, returns: [outp: Chromatogram]) do
-    DB.fetch_chromatogram(inp)
+    outp.emit(DB.fetch_chromatogram(inp))
   end
 
   defnode save_chromatogram(inp: Chromatogram, returns: [outp: ChromatogramId]) do
-    DB.save_chromatogram(inp)
+    outp.emit(DB.save_chromatogram(inp))
   end
 
   defnode manually_integrate(chrom_in: Chromatogram, time_range: Range, returns: [chrom_out: Chromatogram]) do
     #chrom_out.emit(Compute.manually_integrate(chrom_in, time_range))
-    Compute.manually_integrate(chrom_in, time_range)
+    chrom_out.emit(Compute.manually_integrate(chrom_in, time_range))
   end
 
   # modifies a peak
