@@ -1,4 +1,5 @@
 defmodule Compute do
+  use Types
   import Hacks
   defstruct2 ManualIntegrationRequest, [raw, smooth, global, full_times, start_time, end_time]
   defstruct2 ManualIntegrationSuccess, [plot, plot_times, peak]

@@ -18,8 +18,8 @@ defmodule GraphSpec do
     %GraphSpec{g | edges: [{src_port, dst_port}|g.edges]}
   end
 
-  def make_node(f, opts \\ []) do
-    NodeSpec.from_cps1(Cps.to_cps1(f), opts)
+  def make_node(name, f, opts \\ []) do
+    NodeSpec.from_cps1(name, Cps.to_cps1(f), opts)
   end
   
   defmacro defnode({name, _, [kws]}, [do: body]) do
@@ -27,7 +27,7 @@ defmodule GraphSpec do
     params = Enum.map(Enum.concat(inputs, outputs), &{elem(&1, 0), [], nil})
     quote do
       def unquote({name, [], nil}) do
-        GraphSpec.make_node(fn unquote_splicing(params) -> unquote(body) end,
+        GraphSpec.make_node(unquote(name), fn unquote_splicing(params) -> unquote(body) end,
         inputs: unquote(inputs),
         outputs: unquote(outputs))
       end
