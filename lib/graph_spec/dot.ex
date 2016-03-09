@@ -35,24 +35,46 @@ defmodule GraphSpec.Dot do
     write_port_group(f, id, g.outputs, gen)
     for n <- g.nodes, do: write(f, n.id, n.name, n.spec, gen)
     node_name_to_id = Map.new(g.nodes, &{&1.name, &1.id})
-    for {src, dst} <- g.edges, do: connect(f, id, src, dst, node_name_to_id)
+    for {src, dst} <- g.edges, do: connect(f, id, g, src, dst, node_name_to_id)
     IO.puts(f, "}")
+    if name == nil do # outermost graph
+      write_external_connections(f, id, g, node_name_to_id, gen)
+    end
   end
 
-  defp connect(f, id, src, dst, node_name_to_id) do
-    style = if elem(src, 0) == nil || elem(dst, 0) == nil do
+  defp write_external_connections(f, id, g, node_name_to_id, gen) do
+    each g.inputs, fn {port_name, type} ->
+      n = Incrementor.next(gen)
+      IO.puts(f, "#{n} [label=\"#{format_type(type)}\", shape=plaintext, fontsize=8]")
+      IO.puts(f, "#{n} -> #{port(id, {nil, port_name}, node_name_to_id)}")
+    end
+    each g.outputs, fn {port_name, type} ->
+      n = Incrementor.next(gen)
+      IO.puts(f, "#{n} [label=\"#{format_type(type)}\", shape=plaintext, fontsize=8]")
+      IO.puts(f, "#{port(id, {nil, port_name}, node_name_to_id)} -> #{n}")
+    end
+  end
+
+  defp connect(f, id, node, {sn, st} = src, {dn, dt} = dst, node_name_to_id) do
+    style = if sn == nil || dn == nil do
       "[arrowhead=none]"
     else
-      ""
+      type = (node.inputs ++ node.outputs)[st]
+      "[label=\"#{format_type(type)}\"]"
     end
     src_id = port(id, src, node_name_to_id)
     dst_id = port(id, dst, node_name_to_id)
     IO.puts(f, "#{src_id} -> #{dst_id} #{style}")
   end
 
+  defp format_type(type) do
+    String.replace(to_string(type), "Elixir.", "")
+  end
+
   defp port(id, {nil, port_name}, node_name_to_id) do
     "port_#{id}_#{port_name}"
   end
+  
   defp port(_, {node_name, port_name}, node_name_to_id) do
     "port_#{node_name_to_id[node_name]}_#{port_name}"
   end
