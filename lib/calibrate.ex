@@ -42,7 +42,7 @@ defmodule Calibrate do
 
   def db_calculate_calibration_curve do
     GraphSpec.new(
-      inputs:  [sample_ids: Array.of(SampleId), comp_name: String, assay_id: AssayId],
+      inputs:  [sample_ids: Array.of(SampleId), comp_name: CompoundName, assay_id: AssayId],
       outputs: [curve_id: CalibrationCurveId],
       nodes:   [points_fetcher: fetch_calibration_points,
                 method_fetcher: fetch_calibration_method,
@@ -59,5 +59,25 @@ defmodule Calibrate do
         saver.curve_id -> curve_id
       end)
   end
+
+  def calculate_all_calibration_curves do
+    GraphSpec.new(
+      inputs: [sample_ids: Array.of(SampleId),
+               assay_id: AssayId,
+               compound_names: AsyncArray.of(CompoundName)],
+      outputs: [curve_ids: AsyncArray.of(CalibrationCurveId)],
+      nodes: [calculator: db_calculate_calibration_curve],
+      connections: edges do
+        sample_ids -> calculator.sample_ids
+        assay_id -> calculator.assay_id
+        split compound_names -> calculator.comp_name
+        merge calculator.curve_id -> curve_ids
+      end
+    )
+  end
+
+  # def go do
+  #   lift_parallel(db_calculate_calibration_curve, multi: [comp_name: compound_names, curve_id: curve_ids])
+  # end
 
 end

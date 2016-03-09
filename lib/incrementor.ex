@@ -1,10 +1,10 @@
 defmodule Incrementor do
-  def new(init \\ 0) do
+  def new(init \\ 0, mapper \\ &(&1)) do
     {:ok, a} = Agent.start_link(fn -> init end)
-    a
+    {a, mapper}
   end
 
-  def next(incrementor) do
-    Agent.get_and_update(incrementor, fn i -> {i, i+1} end)
+  def next({a, mapper}) do
+    mapper.(Agent.get_and_update(a, fn i -> {i, i+1} end))
   end
 end

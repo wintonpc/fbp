@@ -1,10 +1,10 @@
 defmodule NodeSpec do
-  defstruct name: nil, inputs: nil, outputs: nil, f: nil
+  defstruct type: nil, inputs: nil, outputs: nil, f: nil
   
-  def from_cps1(name, f, opts \\ []) do
+  def from_cps1(type, f, opts \\ []) do
     inputs = opts[:inputs] || []
     outputs = opts[:outputs] || []
-    %NodeSpec{name: name, inputs: inputs, outputs: outputs, f: f}
+    %NodeSpec{type: type, inputs: inputs, outputs: outputs, f: f}
   end
 
   def find_input(node_spec, name) do
