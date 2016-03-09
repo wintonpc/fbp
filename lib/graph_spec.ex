@@ -11,7 +11,8 @@ defmodule GraphSpec do
     connections = opts[:connections] || []
     node_insts = instantiate_nodes(nodes)
     g = %GraphSpec{type: type, nodes: node_insts, edges: connections, inputs: inputs, outputs: outputs}
-    validate(g)
+    GraphSpec.Validation.validate(g)
+    g
   end
 
   defp id_for_name(name, nodes) do
@@ -21,6 +22,7 @@ defmodule GraphSpec do
     |> List.first
   end
 
+  def find_node_by_name(g, nil), do: g
   def find_node_by_name(g, name) do
     g.nodes
     |> filter(&(&1.name == name))
@@ -71,7 +73,7 @@ defmodule GraphSpec do
   end
   
   defmacro defnode({name, _, [kws]}, [do: body]) do
-    {[returns: outputs], inputs} = Enum.partition(kws, fn {k, _} -> k == :returns end)
+    {[outputs: outputs], inputs} = Enum.partition(kws, fn {k, _} -> k == :outputs end)
     params = Enum.map(Enum.concat(inputs, outputs), &{elem(&1, 0), [], nil})
     quote do
       def unquote({name, [], nil}) do
@@ -96,6 +98,7 @@ defmodule GraphSpec do
     end
   end
 
+  defp fqport({{:., _, [{:this, _, _}, port]}, _, _}), do: {nil, port}
   defp fqport({{:., _, [{name, _, _}, port]}, _, _}), do: {name, port}
-  defp fqport({port, _, _}), do: {nil, port}
+  defp fqport(_), do: {nil, nil} # hack for demo (split/merge)
 end

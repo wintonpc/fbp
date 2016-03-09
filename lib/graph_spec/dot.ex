@@ -71,7 +71,19 @@ defmodule GraphSpec.Dot do
     IO.puts(f, "#{src_id} -> #{dst_id} #{style}")
   end
 
-  defp format_type(type) do
+  def format_type(%GenericType{name: name, argument: arg}) do
+    "#{format_type(name)}.of(#{format_type(arg)})"
+  end
+
+  def format_type(%StructType{name: name}) do
+    format_type(name)
+  end
+  
+  def format_type(%BasicType{name: name}) do
+    format_type(name)
+  end
+  
+  def format_type(type) do
     #String.replace(to_string(type), "Elixir.", "")
     List.last(Module.split(type))
   end

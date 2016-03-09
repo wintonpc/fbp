@@ -8,8 +8,12 @@ defmodule Types do
   deftype_struct Trace, fields: [:x, :y]
   deftype_struct Peak, fields: []
   deftype_struct TimeRange, fields: [:a, :b]
+  deftype_struct CalibrationPoint, fields: []
+  deftype_basic String
+  deftype_basic Number
   deftype_basic SampleId, extends: String
   deftype_basic AssayId, extends: String
   deftype_basic CompoundName, extends: String
+  deftype_generic Array.of(T)
 end
 
