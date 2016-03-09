@@ -81,6 +81,14 @@ defmodule GraphSpec do
       end
     end
   end
+
+  defmacro defgraph({name, _, [kws]}) do
+    quote do
+      def unquote({name, [], nil}) do
+        GraphSpec.new(unquote(name), unquote(kws))
+      end
+    end
+  end
   
   defmacro edges([do: es]) do
     Enum.map es, fn {:->, _, [[src], dst]} ->
