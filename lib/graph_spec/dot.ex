@@ -35,7 +35,11 @@ defmodule GraphSpec.Dot do
     write_port_group(f, id, g.outputs, gen)
     for n <- g.nodes, do: write(f, n.id, n.name, n.spec, gen)
     node_name_to_id = Map.new(g.nodes, &{&1.name, &1.id})
-    for {src, dst} <- g.edges, do: connect(f, id, g, src, dst, node_name_to_id)
+    each g.edges, fn {src, dst} ->
+      {sn, _} = src
+      src_node = GraphSpec.find_node_by_name(g, sn)
+      connect(f, id, src_node, src, dst, node_name_to_id)
+    end
     IO.puts(f, "}")
     if name == nil do # outermost graph
       write_external_connections(f, id, g, node_name_to_id, gen)
@@ -55,11 +59,11 @@ defmodule GraphSpec.Dot do
     end
   end
 
-  defp connect(f, id, node, {sn, st} = src, {dn, dt} = dst, node_name_to_id) do
+  defp connect(f, id, src_node, {sn, sp} = src, {dn, dp} = dst, node_name_to_id) do
     style = if sn == nil || dn == nil do
       "[arrowhead=none]"
     else
-      type = (node.inputs ++ node.outputs)[st]
+      type = (src_node.spec.outputs)[sp]
       "[label=\"#{format_type(type)}\"]"
     end
     src_id = port(id, src, node_name_to_id)
@@ -68,7 +72,8 @@ defmodule GraphSpec.Dot do
   end
 
   defp format_type(type) do
-    String.replace(to_string(type), "Elixir.", "")
+    #String.replace(to_string(type), "Elixir.", "")
+    List.last(Module.split(type))
   end
 
   defp port(id, {nil, port_name}, node_name_to_id) do
@@ -126,9 +131,5 @@ defmodule GraphSpec.Dot do
 
   defp header_label_name(name, type) do
     if name == type, do: "", else: "\\n\\\"#{name}\\\""
-  end
-
-  defp dot_edge(src, dst) do
-    "#{src} -> #{dst}"
   end
 end

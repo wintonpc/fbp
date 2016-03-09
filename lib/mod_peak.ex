@@ -5,28 +5,29 @@ defmodule ModPeak do
   use Types
   import GraphSpec
   
-  defnode fetch_chromatogram(inp: ChromatogramId, returns: [outp: Chromatogram]) do
-    outp.emit(DB.fetch_chromatogram(inp))
+  defnode fetch_chromatogram(i: ChromatogramId, returns: [o: Chromatogram]) do
+    o.emit(DB.fetch_chromatogram(i))
   end
 
-  defnode save_chromatogram(inp: Chromatogram, returns: [outp: ChromatogramId]) do
-    outp.emit(DB.save_chromatogram(inp))
+  defnode save_chromatogram(i: Chromatogram, returns: [o: ChromatogramId]) do
+    o.emit(DB.save_chromatogram(i))
   end
 
-  defnode manually_integrate(chrom_in: Chromatogram, time_range: Range, returns: [chrom_out: Chromatogram]) do
-    chrom_out.emit(Compute.manually_integrate(chrom_in, time_range))
+  defnode manually_integrate(ci: Chromatogram, rng: Range, returns: [co: Chromatogram]) do
+    co.emit(Compute.manually_integrate(ci, rng))
   end
 
   # modifies a peak
   def mod_peak do
     GraphSpec.new(
-      inputs:  [chrom_in: Chromatogram, time_range: Range],
-      outputs: [chrom_out: Chromatogram],
-      nodes:   [integrator: manually_integrate],
+      :mod_peak,
+      inputs:  [ci: Chromatogram, rng: Range],
+      outputs: [co: Chromatogram],
+      nodes:   [manually_integrate: manually_integrate],
       connections: edges do
-        time_range -> integrator.time_range
-        chrom_in -> integrator.chrom_in
-        integrator.chrom_out -> chrom_out
+        rng -> manually_integrate.rng
+        ci -> manually_integrate.ci
+        manually_integrate.co -> co
       end)
   end
 
@@ -35,17 +36,18 @@ defmodule ModPeak do
   # saves it back to the database
   def db_mod_peak do
     GraphSpec.new(
-      inputs:  [chrom_id_in: ChromatogramId, time_range: Range],
-      outputs: [chrom_id_out: ChromatogramId],
-      nodes:   [fetcher: fetch_chromatogram,
-                modifier: mod_peak,
-                saver: save_chromatogram],
+      :db_mod_peak,
+      inputs:  [ci: ChromatogramId, rng: Range],
+      outputs: [co: ChromatogramId],
+      nodes:   [fetch_chromatogram: fetch_chromatogram,
+                mod_peak: mod_peak,
+                save_chromatogram: save_chromatogram],
       connections: edges do
-        chrom_id_in -> fetcher.inp
-        time_range -> modifier.time_range
-        fetcher.outp -> modifier.chrom_in
-        modifier.chrom_out -> saver.inp
-        saver.outp -> chrom_id_out
+        ci -> fetch_chromatogram.i
+        rng -> mod_peak.rng
+        fetch_chromatogram.o -> mod_peak.ci
+        mod_peak.co -> save_chromatogram.i
+        save_chromatogram.o -> co
       end)
   end
 end

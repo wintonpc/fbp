@@ -21,6 +21,12 @@ defmodule GraphSpec do
     |> List.first
   end
 
+  def find_node_by_name(g, name) do
+    g.nodes
+    |> filter(&(&1.name == name))
+    |> List.first
+  end
+
   defp duplicate(%NodeSpec{} = n), do: n
   defp duplicate(%GraphSpec{} = g) do
     %GraphSpec{g | nodes: instantiate_nodes(map(g.nodes, &{&1.name, &1.spec}))}
