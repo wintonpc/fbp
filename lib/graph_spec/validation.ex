@@ -8,6 +8,7 @@ defmodule GraphSpec.Validation do
     at_least_one_port(node)
     all_ports_connected(node)
     connected_ports_are_compatible(node)
+    no_cycles(node)
   end
 
   def unique_port_names(node) do
@@ -26,6 +27,24 @@ defmodule GraphSpec.Validation do
   end
 
   defstruct2 Port, [node, name, type]
+
+  def no_cycles(%NodeSpec{}), do: :ok
+  def no_cycles(%GraphSpec{nodes: nodes, edges: edges}) do
+    import List, only: [first: 1, last: 1]
+    case Topology.with_graph(nodes, &(&1.name), &(&1), &internal_efferents(&1, edges), fn _ -> :ok end) do
+      {:error, {:cycle, names}} ->
+        names = if first(names) != last(names), do: names ++ [first(names)], else: names
+        raise "Error: the graph has a cycle: #{map_join(names, " -> ", &to_string(&1))}"
+      x ->
+        x
+    end
+  end
+
+  defp internal_efferents(node, edges) do
+    edges
+    |> filter(fn {{sn, sp}, {dn, dp}} -> sn != nil && dn != nil && sn == node.name end)
+    |> map(fn {_, {dn, _}} -> dn end)
+  end
   
   def connected_ports_are_compatible(%NodeSpec{}), do: :ok
   def connected_ports_are_compatible(%GraphSpec{} = g) do
@@ -68,10 +87,34 @@ defmodule GraphSpec.Validation do
     unconnected_tails = tails -- srcs
     unconnected_heads = heads -- dsts
 
+    check_for_direction_error(sinks, tails, g.edges, "sink", "source", &edge_tail/1)
+    check_for_direction_error(sources, heads, g.edges, "source", "sink", &edge_head/1)
     check_for_connection_error("sink ports", unconnected_sinks)
     check_for_connection_error("source ports", unconnected_sources)
     check_for_connection_error("edge tails", unconnected_tails)
     check_for_connection_error("edge heads", unconnected_heads)
+  end
+
+  defp check_for_direction_error(ports, ends, edges, actual, used_as, end_selector) do
+    errors = for p <- ports, {n_name, p_name} <- ends, port_matches(n_name, p_name).(p), do: {p, {n_name, p_name}}
+    case errors do
+      [{p, e}|_] ->
+        formatted_port = format_port({node_name(p.node), p.name})
+        bad_edge = edges
+        |> filter(&(end_selector.(&1) == e))
+        |> List.first
+        raise "Error: #{formatted_port} is a #{actual} and cannot be used as a #{used_as} " <>
+          "(in #{format_edge(bad_edge)})"
+      _ ->
+        :ok
+    end
+  end
+
+  defp edge_tail({x, _}), do: x
+  defp edge_head({_, x}), do: x
+
+  defp format_edge({src, dst}) do
+    "#{format_port(src)} -> #{format_port(dst)}"
   end
 
   defp check_for_connection_error(what, xs) do

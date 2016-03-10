@@ -95,6 +95,62 @@ defmodule GraphSpec.ValidationTest do
                  "Error: a.o (Number) cannot flow to this.o (String)")
   end
 
+  test "sink used as source" do
+    assert_error(make_graph(:g,
+                            inputs: [i: String],
+                            outputs: [o: String],
+                            nodes: [a: node_a],
+                            connections: edges do
+                              this.i -> a.i
+                              a.o -> this.o
+                              this.o -> a.i
+                            end),
+      "Error: this.o is a sink and cannot be used as a source (in this.o -> a.i)")
+  end
+
+  test "source used as sink" do
+    assert_error(make_graph(:g,
+                            inputs: [i: String],
+                            outputs: [o: String],
+                            nodes: [a: node_a],
+                            connections: edges do
+                              this.i -> a.i
+                              a.o -> this.o
+                              this.i -> a.o
+                            end),
+      "Error: a.o is a source and cannot be used as a sink (in this.i -> a.o)")
+  end
+
+  test "cycle detection" do
+    assert_error(make_graph(:g,
+                            inputs: [i: String],
+                            outputs: [o: String],
+                            nodes: [make_node(:a,
+                                              inputs: [i: String, p: Number],
+                                              outputs: [o: String, q: Number])],
+                            connections: edges do
+                              this.i -> a.i
+                              a.o -> this.o
+                              a.q -> a.p
+                            end),
+      "Error: the graph has a cycle: a -> a")
+    
+    assert_error(make_graph(:g,
+                            inputs: [i: String],
+                            outputs: [o: String],
+                            nodes: [x: node_c, y: node_c, z: node_c],
+                            connections: edges do
+                              this.i -> x.i
+                              x.o -> y.i
+                              y.o -> z.i
+                              z.o -> this.o
+                              x.q -> y.p
+                              y.q -> z.p
+                              z.q -> x.p
+                            end),
+      "Error: the graph has a cycle: x -> y -> z -> x")
+  end
+
   test "all_ports" do
     result =
       GraphSpec.Validation.all_ports(
@@ -120,6 +176,10 @@ defmodule GraphSpec.ValidationTest do
 
   def node_b do
     make_node(:b, inputs: [i: String], outputs: [o: Number])
+  end
+  
+  def node_c do
+    make_node(:c, inputs: [i: String, p: Number], outputs: [o: String, q: Number])
   end
   
   def make_node(name, opts \\ []) do
