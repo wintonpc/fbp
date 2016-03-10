@@ -1,7 +1,7 @@
 defmodule NodeSpec do
   defstruct type: nil, inputs: nil, outputs: nil, f: nil
   
-  def from_cps1(type, f, opts \\ []) do
+  def make(type, f, opts \\ []) do
     inputs = opts[:inputs] || []
     outputs = opts[:outputs] || []
     n = %NodeSpec{type: type, inputs: inputs, outputs: outputs, f: f}

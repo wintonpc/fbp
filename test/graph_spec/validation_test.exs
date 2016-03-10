@@ -197,7 +197,7 @@ defmodule GraphSpec.ValidationTest do
   end
   
   def make_node(name, opts \\ []) do
-    NodeSpec.from_cps1(name, &(&1), opts)
+    NodeSpec.make(name, &(&1), opts)
   end
 
   def make_graph(name, opts \\ []) do

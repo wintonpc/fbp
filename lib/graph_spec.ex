@@ -69,7 +69,7 @@ defmodule GraphSpec do
   end
 
   def make_node(name, f, opts \\ []) do
-    NodeSpec.from_cps1(name, Cps.to_cps1(f), opts)
+    NodeSpec.make(name, f, opts)
   end
   
   defmacro defnode({name, _, [kws]}, [do: body]) do
