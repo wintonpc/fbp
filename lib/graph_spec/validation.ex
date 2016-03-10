@@ -9,6 +9,7 @@ defmodule GraphSpec.Validation do
     all_ports_connected(node)
     connected_ports_are_compatible(node)
     no_cycles(node)
+    no_implicit_merges(node)
   end
 
   def unique_port_names(node) do
@@ -42,7 +43,7 @@ defmodule GraphSpec.Validation do
 
   defp internal_efferents(node, edges) do
     edges
-    |> filter(fn {{sn, sp}, {dn, dp}} -> sn != nil && dn != nil && sn == node.name end)
+    |> filter(fn {{sn, sp}, {dn, dp}} -> sn != nil && dn != nil && sn == node_name(node) end)
     |> map(fn {_, {dn, _}} -> dn end)
   end
   
@@ -66,6 +67,7 @@ defmodule GraphSpec.Validation do
     |> single
   end
 
+  defp port_matches({n_name, p_name}), do: port_matches(n_name, p_name)
   defp port_matches(n_name, p_name) do
     fn %Port{node: node, name: name} ->
       n_name == node_name(node) && p_name == name
@@ -76,7 +78,7 @@ defmodule GraphSpec.Validation do
   def all_ports_connected(%GraphSpec{} = g) do
     {sources, sinks} = all_ports(g)
     {tails, heads} = all_ends(g)
-    
+
     srcs = dedup(sort(map(sources, fn p -> {node_name(p.node), p.name} end)))
     dsts = dedup(sort(map(sinks,   fn p -> {node_name(p.node), p.name} end)))
     tails = dedup(sort(tails))
@@ -93,6 +95,31 @@ defmodule GraphSpec.Validation do
     check_for_connection_error("source ports", unconnected_sources)
     check_for_connection_error("edge tails", unconnected_tails)
     check_for_connection_error("edge heads", unconnected_heads)
+  end
+
+  defp simple_port(%Port{node: node, name: name}) do
+    {node_name(node), name}
+  end
+  
+  defp no_implicit_merges(%NodeSpec{}), do: :ok
+  defp no_implicit_merges(%GraphSpec{} = g) do
+    {_, sinks} = all_ports(g)
+    {_, heads} = all_ends(g)
+    
+    implicit_merge = sinks
+    |> map(fn s -> {s, filter(heads, &port_matches(&1).(s))} end)
+    |> filter(fn {_, heads} -> length(heads) > 1 end)
+    |> List.first
+
+    if implicit_merge do
+      {s, heads} = implicit_merge
+      simple_s = simple_port(s)
+      afferent_sources = g.edges
+      |> filter(fn {_, dst} -> dst == simple_s end)
+      |> map(fn {src, _} -> src end)
+      
+      raise "Error: invalid merge: #{map_join(afferent_sources, " + ", &format_port/1)} -> #{format_port(simple_s)}"
+    end
   end
 
   defp check_for_direction_error(ports, ends, edges, actual, used_as, end_selector) do

@@ -33,6 +33,20 @@ defmodule GraphSpec.ValidationTest do
     assert_error(make_graph(:g), "Error: node has no ports!")
   end
 
+  test "implicit merge" do
+    assert_error(make_graph(:g,
+                            inputs: [i: String],
+                            outputs: [o: Number],
+                            nodes: [a: node_a, b: node_a],
+                            connections: edges do
+                              this.i -> a.i
+                              this.i -> b.i
+                              a.o -> this.o
+                              b.o -> this.o
+                            end),
+                 "Error: invalid merge: a.o + b.o -> this.o")
+  end
+
   test "unconnected sink port" do
     assert_error(make_graph(:g,
                             inputs: [i: String],
