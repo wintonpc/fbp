@@ -28,12 +28,15 @@ defmodule GraphSpec.Dot do
     File.close(file)
   end
 
-  defp write(f, id, name, %GraphSpec{} = g, gen) do
+  defp write(f, id, name, g, gen), do: write(f, id, name, g, gen, 1)
+  defp write(f, id, name, %GraphSpec{} = g, gen, depth) do
     IO.puts(f, "subgraph cluster_#{id} {")
+    brightness = 1 - (0.1 * depth)
+    IO.puts(f, "bgcolor=\"0 0 #{brightness}\"")
     IO.puts(f, header_label(name, g.type))
     write_port_group(f, id, g.inputs, gen)
     write_port_group(f, id, g.outputs, gen)
-    for n <- g.nodes, do: write(f, n.id, n.name, n.spec, gen)
+    for n <- g.nodes, do: write(f, n.id, n.name, n.spec, gen, depth + 1)
     node_name_to_id = Map.new(g.nodes, &{&1.name, &1.id})
     each g.edges, fn {src, dst} ->
       {sn, _} = src
@@ -96,7 +99,7 @@ defmodule GraphSpec.Dot do
     "port_#{node_name_to_id[node_name]}_#{port_name}"
   end
 
-  defp write(f, id, name, %NodeSpec{} = node, gen) do
+  defp write(f, id, name, %NodeSpec{} = node, gen, _) do
     IO.puts(f, "subgraph cluster_#{id} {")
     IO.puts(f, "bgcolor=lightskyblue1")
     IO.puts(f, "label=\"\"")

@@ -30,8 +30,33 @@ defmodule FlowTest do
     end)
   
   test "graph flow" do
+    #GraphSpec.Dot.render_dot(multi1, "graph")
     [values: [o: result]] = Flow.run(multi1, args: [a: 1, b: 2, c: 3])
     assert result == 9
+  end
+
+  defgraph multi2(
+    inputs: [a: Number, b: Number, c: Number, d: Number],
+    outputs: [o: Number, z: Number],
+    nodes: [adder, p: multi1, q: multi1],
+    connections: edges do
+      this.a -> p.a
+      this.a -> q.a
+      this.b -> p.b
+      this.b -> q.b
+      this.c -> p.c
+      this.d -> q.c
+      p.o -> adder.a
+      q.o -> adder.b
+      q.o -> this.z
+      adder.sum -> this.o
+    end)
+
+  test "graph flow 2" do
+    GraphSpec.Dot.render_dot(multi2, "graph")
+    [values: [o: result, z: z]] = Flow.run(multi2, args: [a: 1, b: 2, c: 3, d: 10])
+    assert result == 39
+    assert z == 30
   end
   
 end
