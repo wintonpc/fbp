@@ -165,6 +165,10 @@ defmodule GraphSpec.ValidationTest do
       "Error: the graph has a cycle: x -> y -> z -> x")
   end
 
+  test "known port types" do
+    # TODO
+  end
+
   test "all_ports" do
     result =
       GraphSpec.Validation.all_ports(

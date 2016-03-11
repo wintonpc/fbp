@@ -2,26 +2,42 @@ defmodule Flow do
   import Enum
   import Enum2
   import Hacks
-
+  import GraphSpec
+  
   defstruct2 Input, [name, send]
   defstruct2 Emitter, [emit]
-  defstruct2 WiredNode, [spec, sinks, subscribe, run]
+
+  defmodule WiredNode do
+    defstruct spec: nil, send_fns: nil, subscribe_fn: nil, run_fn: nil
+
+    def send(%WiredNode{send_fns: send_fns}, port_name, value) do
+      send_fns[port_name].(value)
+    end
+
+    def run(%WiredNode{run_fn: run_fn}) do
+      run_fn.()
+    end
+
+    def subscribe(%WiredNode{subscribe_fn: subscribe_fn}, out_port_name, send_fn) do
+      subscribe_fn.({out_port_name, send_fn})
+    end
+  end
 
   # messages
   # {:value, dest_port_name, value}
   #   Represents a value being sent to the receiving process/node's input port.
-  # {:subscribe, src_port_name, send_func}
+  # {:subscribe, src_port_name, send_fn}
   #   Instructs the receiving process/node to connect an output port to the specified sink.
-  #   - send_func receives a value and provides it to a sink port
+  #   - send_fn receives a value and provides it to a sink port
   
   # spec is a NodeSpec or GraphSpec
   def run(spec, opts) do
     args = opts[:args] || []
     validate_args(args, spec)
     wn = wire(spec)
-    each(wn.sinks, {name, send} ~> send.(args[name]))
-    each(spec.outputs, {name, _} ~> wn.subscribe.(name, make_sender(self, name)))
-    wn.run.()
+    each(args, {name, value} ~> WiredNode.send(wn, name, value))
+    each(out_port_names(spec), &WiredNode.subscribe(wn, &1, make_sender(self, &1)))
+    WiredNode.run(wn)
     [values: receive_values(spec.outputs)]
   end
 
@@ -54,72 +70,54 @@ defmodule Flow do
     end
   end
 
-  # returns {sinks, subscribe_func}
-  # sinks is a keyword list of input_port_name -> send_func
-  # subscribe_func takes a sink_map
   defp wire(%NodeSpec{inputs: inputs} = spec) do
-    node_pid = spawn_link(fn -> run_node(spec) end)
-    sinks = map(inputs, {name, _} ~> {name, make_sender(node_pid, name)})
-    subscribe = fn (src_port_name, send_func) -> send(node_pid, {:subscribe, src_port_name, send_func}) end
-    %WiredNode{spec: spec, sinks: sinks, subscribe: subscribe, run: fn -> send(node_pid, {:run}) end}
+    node_pid = spawn_link(thunk(run_node(spec)))
+    %WiredNode{spec: spec,
+               send_fns: map(in_port_names(spec), name ~> {name, make_sender(node_pid, name)}),
+               subscribe_fn: {out_port_name, send_fn} ~> send_subscription(node_pid, out_port_name, send_fn),
+               run_fn: thunk(send_run(node_pid))}
   end
 
   defp wire(%GraphSpec{nodes: node_insts, edges: edges} = gspec) do
     wired_nodes = map(node_insts, %GraphSpec.NodeInst{name: name, spec: spec} ~> {name, wire(spec)})
-    each wired_nodes, fn {src_node_name, %WiredNode{spec: spec, subscribe: subscribe}} ->
-      src_ports = map(spec.outputs, {src_port_name, _} ~> {src_node_name, src_port_name})
-      each src_ports, fn ({src_node_name, src_port_name} = src_port) ->
-        dst_send_funcs = dst_sinks(src_port, edges, wired_nodes)
-        each dst_send_funcs, fn send_func ->
-          subscribe.(src_port_name, send_func)
-        end
-      end
+
+    # subscribe the nodes to each other
+    for {node_name, wn} <- wired_nodes,
+        out_port <- out_ports(node_name, wn.spec),
+        send_fn <- dst_send_fns(out_port, gspec, wired_nodes),
+        do: WiredNode.subscribe(wn, name(out_port), send_fn)
+
+    # send_fns for the exposed input ports delegate to internal send_fns
+    send_fns = map in_ports(gspec), fn in_port ->
+      internal_send_fns = dst_send_fns(in_port, gspec, wired_nodes)
+      {name(in_port), value ~> each(internal_send_fns, &(&1.(value)))}
     end
 
-    in_ports = map(gspec.inputs, {port_name, _} ~> {nil, port_name})
-    sinks = map in_ports, fn ({_, port_name} = in_port) ->
-      inner_sinks = dst_sinks(in_port, edges, wired_nodes)
-      {port_name, value ~> each(inner_sinks, &(&1.(value)))}
+    # subscribe_fn delegates to the internal subscribe_fns
+    publisher_map = map out_ports(gspec), fn out_port ->
+      {src_node_name, src_port_name} = src_port(gspec, out_port)
+      src_wn = wired_nodes[src_node_name]
+      {name(out_port), send_fn ~> WiredNode.subscribe(src_wn, src_port_name, send_fn)}
     end
 
-
-    out_ports = map(gspec.outputs, {port_name, _} ~> {nil, port_name})
-    out_subscriber_map = map out_ports, fn ({_, op_name} = op) ->
-      {src_node_name, src_port_name} = src_port(op, edges)
-      wn = Keyword.fetch!(wired_nodes, src_node_name)
-      {op_name, sink ~> wn.subscribe.(src_port_name, sink)}
+    subscribe_fn = fn {out_port_name, send_fn} ->
+      # find which node to actually subscribe to
+      subscribe_to_port_fn = publisher_map[out_port_name]
+      subscribe_to_port_fn.(send_fn)
     end
+
+    run_all = thunk(each(wired_nodes, {_, wn} ~> WiredNode.run(wn)))
     
-    subscribe = fn (ext_port_name, sink) ->
-      sub_port = Keyword.fetch!(out_subscriber_map, ext_port_name)
-      sub_port.(sink)
-    end
-
-    run_all = fn -> each(wired_nodes, {_, wn} ~> wn.run.()) end
-    
-    %WiredNode{spec: gspec, sinks: sinks, subscribe: subscribe, run: run_all}
+    %WiredNode{spec: gspec, send_fns: send_fns, subscribe_fn: subscribe_fn, run_fn: run_all}
   end
 
-  defp dst_sinks(src_port, edges, wired_nodes) do
-    dps = dst_ports(src_port, edges)
-    map(dps, &find_sink(&1, wired_nodes))
+  defp dst_send_fns(src_port, gspec, wired_nodes) do
+    dps = reject(dst_ports(gspec, src_port), &exposed_port?/1)
+    map(dps, &find_send_fn(&1, wired_nodes))
   end
 
-  defp dst_ports(src_port, edges) do
-    edges
-    |> filter({src, {dn, _} = dst} ~> (src == src_port && dn != nil)) # reject graph outputs. those will be subscribed later.
-    |> map({_, dst} ~> dst)
-  end
-
-  defp src_port(dst_port, edges) do
-    edges
-    |> filter({_, dst} ~> (dst == dst_port))
-    |> map({src, _} ~> src)
-    |> single
-  end
-
-  defp find_sink({node_name, port_name}, wired_nodes) do
-    Keyword.fetch!(Keyword.fetch!(wired_nodes, node_name).sinks, port_name)
+  defp find_send_fn({node_name, port_name}, wired_nodes) do
+    wired_nodes[node_name].send_fns[port_name]
   end
 
   defp make_sender(pid, port_name) do
@@ -130,20 +128,28 @@ defmodule Flow do
     send(pid, {:value, name, value})
   end
 
+  defp send_subscription(pid, src_port_name, send_fn) do
+    send(pid, {:subscribe, src_port_name, send_fn})
+  end
+
+  defp send_run(pid) do
+    send(pid, :run)
+  end
+
   # node process code
   defp run_node(%NodeSpec{inputs: inputs, outputs: outputs, f: f}) do
     sink_map = accept_sink_map
     args = Keyword.values(receive_values(inputs))
-    emitters = map(outputs, {name, _} ~> make_emitter(Keyword.fetch!(sink_map, name)))
+    emitters = map(outputs, {name, _} ~> make_emitter(sink_map[name]))
     apply(f, args ++ emitters) # TODO: order according to inputs
   end
 
   defp accept_sink_map, do: accept_sink_map([])
   defp accept_sink_map(acc) do
     receive do
-      {:subscribe, src_port_name, send_func} ->
-        accept_sink_map(Keyword.update(acc, src_port_name, [send_func], senders ~> [send_func|senders]))
-      {:run} ->
+      {:subscribe, src_port_name, send_fn} ->
+        accept_sink_map(Keyword.update(acc, src_port_name, [send_fn], senders ~> [send_fn|senders]))
+      :run ->
         acc
     after 3000 ->
         raise "subscribe much?!"

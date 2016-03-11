@@ -71,6 +71,13 @@ defmodule Hacks do
     end
   end
 
+  defmacro thunk(expr) do
+    quote do
+      fn -> unquote(expr) end
+    end
+  end
+  
+
   defmacro defi({name, _, params}, [do: body]) do
     quote do
       unquote({name, [], nil}) = fn unquote_splicing(params) -> unquote(body) end

@@ -1,6 +1,8 @@
 defmodule GraphSpec do
   import Hacks
   import Enum
+  import Enum2
+  
   defstruct type: nil, nodes: nil, edges: nil, inputs: nil, outputs: nil
   defstruct2 NodeInst, [id, name, spec]
   
@@ -72,6 +74,50 @@ defmodule GraphSpec do
   def make_node(name, f, opts \\ []) do
     NodeSpec.make(name, f, opts)
   end
+
+  def dst_ports(%GraphSpec{edges: edges}, src_port) do
+    paired_ports(edges, src_port)
+  end
+
+  def src_port(%GraphSpec{edges: edges}, dst_port) do
+    single(paired_ports(map(edges, &flip_tuple/1), dst_port))
+  end
+
+  defp paired_ports(edges, first_port) do
+    filter_map(edges,
+               {a, _} ~> (a == first_port),
+               {_, b} ~> b)
+  end
+
+  def in_ports(%GraphSpec{inputs: inputs}) do
+    map(inputs, {port_name, _type} ~> {nil, port_name})
+  end
+
+  def out_ports(%GraphSpec{outputs: outputs}) do
+    map(outputs, {port_name, _type} ~> {nil, port_name})
+  end
+
+  def in_ports(node_name, spec) do
+    map(in_port_names(spec), &{node_name, &1})
+  end
+
+  def out_ports(node_name, spec) do
+    map(out_port_names(spec), &{node_name, &1})
+  end
+
+  def in_port_names(spec) do
+    map(spec.inputs, {name, _type} ~> name)
+  end
+
+  def out_port_names(spec) do
+    map(spec.outputs, {name, _type} ~> name)
+  end
+
+  def name({_node_name, port_name} = _port), do: port_name
+
+  defp flip_tuple({a, b}), do: {b, a}
+
+  def exposed_port?({node_name, _port_name}), do: node_name == nil
   
   defmacro defnode({name, _, [kws]}, [do: body]) do
     {[outputs: outputs], inputs} = Enum.partition(kws, fn {k, _} -> k == :outputs end)
@@ -92,7 +138,7 @@ defmodule GraphSpec do
       end
     end
   end
-  
+
   defmacro edges([do: es]) do
     Enum.map es, fn {:->, _, [[src], dst]} ->
       {fqport(src), fqport(dst)}

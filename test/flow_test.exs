@@ -53,7 +53,7 @@ defmodule FlowTest do
     end)
 
   test "graph flow 2" do
-    GraphSpec.Dot.render_dot(multi2, "graph")
+    #GraphSpec.Dot.render_dot(multi2, "graph")
     [values: [o: result, z: z]] = Flow.run(multi2, args: [a: 1, b: 2, c: 3, d: 10])
     assert result == 39
     assert z == 30
