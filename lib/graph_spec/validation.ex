@@ -1,5 +1,6 @@
 defmodule GraphSpec.Validation do
   import Enum
+  import Enum2
   import Hacks
   
   def validate(node) do
@@ -187,10 +188,4 @@ defmodule GraphSpec.Validation do
       raise "Error: duplicate #{what}: #{inspect(duplicates)}"
     end
   end
-
-  def single(enum), do: do_single(to_list(enum))
-  defp do_single([]), do: raise "attempted single([])"
-  defp do_single([x]), do: x
-  defp do_single(stream) when is_function(stream), do: do_single(Enum.to_list(Stream.take(stream, 1)))
-  defp do_single(x), do: raise "attempted single(#{inspect(x)})"
 end

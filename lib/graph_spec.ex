@@ -5,6 +5,7 @@ defmodule GraphSpec do
   defstruct2 NodeInst, [id, name, spec]
   
   def new(type, opts \\ []) do
+    expect_keywords(opts, [:inputs, :outputs, :nodes, :connections])
     inputs = opts[:inputs] || []
     outputs = opts[:outputs] || []
     nodes = opts[:nodes] || []
@@ -95,6 +96,13 @@ defmodule GraphSpec do
   defmacro edges([do: es]) do
     Enum.map es, fn {:->, _, [[src], dst]} ->
       {fqport(src), fqport(dst)}
+    end
+  end
+
+  defp expect_keywords(kws, expected_keys) do
+    unexpected = Keyword.keys(kws) -- expected_keys
+    if any?(unexpected) do
+      raise "Unexpected keywords: #{inspect(unexpected)}"
     end
   end
 
