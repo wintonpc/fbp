@@ -1,85 +1,98 @@
 defmodule Flow do
   import Enum
+  import Enum2
   import Hacks
 
-  defstruct2 Input, [name, proc, send]
-  defstruct2 Subscriber, [subscribe]
+  defstruct2 Input, [name, send]
   defstruct2 Emitter, [emit]
+
+  # messages
+  # {:value, dest_port_name, value}
+  #   Represents a value being sent to the receiving process/node's input port.
+  # {:subscribe, sink_map}
+  #   Instructs the receiving process/node to connect its output ports to the specified sinks.
+  #   - sink_map is a keyword list of output_port -> senders
+  #   - senders is a list of send functions
+  #   - a send function receives a value and provides it to a sink port
   
-  def run(node, opts) do
+  # spec is a NodeSpec or GraphSpec
+  def run(spec, opts) do
     args = opts[:args] || []
-    validate_args(args, node)
-    {p, inputs, subscriber} = wire(node)
-    each(inputs, &(&1.send.(args[&1.name])))
-    subscriber.subscribe.(map(node.outputs, fn {name, _} -> {name, [self]} end))
-    [values: receive_values(Keyword.keys(node.outputs))]
+    validate_args(args, spec)
+    {sinks, subscribe} = wire(spec)
+    each(sinks, {name, send} ~> send.(args[name]))
+    subscribe.(map(spec.outputs, {name, _} ~> {name, [make_sender(self, name)]}))
+    [values: receive_values(spec.outputs)]
   end
 
-  defp receive_values(expected), do: receive_values([], expected)
-  defp receive_values(acc, []), do: acc
-  defp receive_values(acc, expected) do
-    IO.puts "receiving values..."
-    receive do
-      {:value, name, value} ->
-        IO.puts "received #{inspect({name, value})}"
-        new_expected = expected -- [name]
-        if new_expected == expected do
-          raise "unexpected value #{name}!"
-        end
-        receive_values([{name, value}|acc], new_expected)
-    end
-  end
-
-  def validate_args(args, node) do
-    if length(args) != length(node.inputs) do
-      raise "Arguments mismatch.\n  inputs = #{inspect(node.inputs)}\n  args = #{inspect(args)}"
+  defp validate_args(args, spec) do
+    if length(args) != length(spec.inputs) do
+      raise "Arguments mismatch.\n  inputs = #{inspect(spec.inputs)}\n  args = #{inspect(args)}"
     end
     # TODO: robustfy
   end
   
-  def wire(%NodeSpec{inputs: inputs} = node) do
-    p = spawn_link(fn -> node_loop(node) end)
-    inps = map inputs, fn {name, type} ->
-      send_func = fn value ->
-        validate_type(value, type) # should this be on the server side?
-        send(p, {:value, name, value})
-      end
-      %Input{name: name, proc: p, send: send_func}
-    end
-    subscriber = %Subscriber{subscribe: fn subscribers -> send(p, {:subscribers, subscribers}) end}
-    {p, inps, subscriber}
+  def emit(%Emitter{emit: emit}, value) do
+    emit.(value)
   end
 
-  def wire(%GraphSpec{}) do
+  # expected is a keyword list, value_name -> value_type
+  defp receive_values(expected), do: receive_values([], Keyword.keys(expected), expected)
+  defp receive_values(acc, [], expected), do: reorder(acc, Keyword.keys(expected), {name, _} ~> name)
+  defp receive_values(acc, remaining, expected) do
+    IO.puts "receiving values..."
+    receive do
+      {:value, name, value} ->
+        IO.puts "received #{inspect({name, value})}"
+        type = expected[name]
+        validate_type(value, type) # should this be on the server side?
+        new_remaining = remaining -- [name]
+        if new_remaining == remaining, do: raise "unexpected value #{name}!"
+        receive_values([{name, value}|acc], new_remaining, expected)
+    end
+  end
+
+  # returns {sinks, subscribe_func}
+  # sinks is a keyword list of input_port_name -> send_func
+  # subscribe_func takes a sink_map
+  defp wire(%NodeSpec{inputs: inputs} = spec) do
+    node_pid = spawn_link(fn -> run_node(spec) end)
+    sinks = map(inputs, {name, _} ~> {name, make_sender(node_pid, name)})
+    subscribe = sink_map ~> send(node_pid, {:subscribe, sink_map})
+    {sinks, subscribe}
+  end
+
+  defp wire(%GraphSpec{}) do
     :ok
   end
 
-  def node_loop(%NodeSpec{} = node) do
-    subscriber_map = receive do
-      {:subscribers, subscriber_map} -> subscriber_map
+  defp make_sender(pid, port_name) do
+    value ~> send_value(pid, port_name, value)
+  end
+
+  defp send_value(pid, name, value) do
+    send(pid, {:value, name, value})
+  end
+
+  # node process code
+  defp run_node(%NodeSpec{inputs: inputs, outputs: outputs, f: f}) do
+    sink_map = accept_sink_map
+    args = Keyword.values(receive_values(inputs))
+    emitters = map(outputs, {name, _} ~> make_emitter(sink_map[name]))
+    apply(f, args ++ emitters) # TODO: order according to inputs
+  end
+
+  defp accept_sink_map do
+    receive do
+      {:subscribe, sink_map} -> sink_map
     end
-    args = reorder2(receive_values(Keyword.keys(node.inputs)), node.inputs)
-    emitters = reorder2(map(node.outputs, fn {name, _} -> {name, make_emitter(self, name, subscriber_map[name])} end), node.outputs)
-    apply(node.f, args ++ emitters) # TODO: order according to inputs
   end
 
-  def make_emitter(node_proc, name, subscribers) do
-    %Emitter{emit: fn value -> broadcast(subscribers, {:value, name, value}) end}
+  defp make_emitter(sinks) do
+    %Emitter{emit: value ~> each(sinks, &(&1.(value)))}
   end
 
-  def broadcast(procs, msg) do
-    each(procs, &send(&1, msg))
-  end
-
-  def validate_type(value, type) do
+  defp validate_type(value, type) do
     :ok # TODO: implement
-  end
-
-  defp reorder(xs, order, get_key) do
-    Enum.map(order, fn o -> Enum.find(xs, fn x -> get_key.(x) == o end) end)
-  end
-
-  defp reorder2(named_values, inputs_or_outputs) do
-    Keyword.values(reorder(named_values, Keyword.keys(inputs_or_outputs), fn {name, _} -> name end))
   end
 end

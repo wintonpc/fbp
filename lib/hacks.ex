@@ -71,9 +71,9 @@ defmodule Hacks do
     end
   end
 
-  # defmacro try_bind(pat, expr, body) do
-  #   quote do
-  #     case unquote(expr) do
-  #       unquote(ex
-  
+  defmacro defi({name, _, params}, [do: body]) do
+    quote do
+      unquote({name, [], nil}) = fn unquote_splicing(params) -> unquote(body) end
+    end
+  end
 end
