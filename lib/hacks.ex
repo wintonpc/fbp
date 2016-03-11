@@ -71,6 +71,10 @@ defmodule Hacks do
     end
   end
 
+  def multi_call(fns, value) do
+    Enum.each(fns, &(&1.(value)))
+  end
+  
   defmacro thunk(expr) do
     quote do
       fn -> unquote(expr) end

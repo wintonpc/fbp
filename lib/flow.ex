@@ -34,10 +34,10 @@ defmodule Flow do
   def run(spec, opts) do
     args = opts[:args] || []
     validate_args(args, spec)
-    wn = wire(spec)
-    each(args, {name, value} ~> WiredNode.send(wn, name, value))
-    each(out_port_names(spec), &WiredNode.subscribe(wn, &1, make_sender(self, &1)))
-    WiredNode.run(wn)
+    wired_node = wire(spec)
+    each(args, {name, value} ~> WiredNode.send(wired_node, name, value))
+    each(out_port_names(spec), &WiredNode.subscribe(wired_node, &1, make_sender(self, &1)))
+    WiredNode.run(wired_node)
     [values: receive_values(spec.outputs)]
   end
 
@@ -48,10 +48,6 @@ defmodule Flow do
     # TODO: robustfy
   end
   
-  def emit(%Emitter{emit: emit}, value) do
-    emit.(value)
-  end
-
   # expected is a keyword list, value_name -> value_type
   defp receive_values(expected), do: receive_values([], Keyword.keys(expected), expected)
   defp receive_values(acc, [], expected), do: reorder(acc, Keyword.keys(expected), {name, _} ~> name)
@@ -68,6 +64,38 @@ defmodule Flow do
         end
         receive_values([{name, value}|acc], new_remaining, expected)
     end
+  end
+
+  defp validate_type(value, type) do
+    :ok # TODO: implement
+  end
+  
+  # node process code
+  defp run_node(%NodeSpec{inputs: inputs, outputs: outputs, f: f}) do
+    sink_map = accept_sink_map
+    args = Keyword.values(receive_values(inputs))
+    emitters = map(outputs, {name, _} ~> make_emitter(sink_map[name]))
+    apply(f, args ++ emitters) # TODO: order according to inputs
+  end
+
+  defp accept_sink_map, do: accept_sink_map([])
+  defp accept_sink_map(acc) do
+    receive do
+      {:subscribe, src_port_name, send_fn} ->
+        accept_sink_map(Keyword.update(acc, src_port_name, [send_fn], senders ~> [send_fn|senders]))
+      :run ->
+        acc
+    after 3000 ->
+        raise "subscribe much?!"
+    end
+  end
+
+  defp make_emitter(send_fns) do
+    %Emitter{emit: value ~> multi_call(send_fns, value)}
+  end
+  
+  def emit(%Emitter{emit: emit}, value) do
+    emit.(value)
   end
 
   defp wire(%NodeSpec{inputs: inputs} = spec) do
@@ -90,7 +118,7 @@ defmodule Flow do
     # send_fns for the exposed input ports delegate to internal send_fns
     send_fns = map in_ports(gspec), fn in_port ->
       internal_send_fns = dst_send_fns(in_port, gspec, wired_nodes)
-      {name(in_port), value ~> each(internal_send_fns, &(&1.(value)))}
+      {name(in_port), value ~> multi_call(internal_send_fns, value)}
     end
 
     # subscribe_fn delegates to the internal subscribe_fns
@@ -134,33 +162,5 @@ defmodule Flow do
 
   defp send_run(pid) do
     send(pid, :run)
-  end
-
-  # node process code
-  defp run_node(%NodeSpec{inputs: inputs, outputs: outputs, f: f}) do
-    sink_map = accept_sink_map
-    args = Keyword.values(receive_values(inputs))
-    emitters = map(outputs, {name, _} ~> make_emitter(sink_map[name]))
-    apply(f, args ++ emitters) # TODO: order according to inputs
-  end
-
-  defp accept_sink_map, do: accept_sink_map([])
-  defp accept_sink_map(acc) do
-    receive do
-      {:subscribe, src_port_name, send_fn} ->
-        accept_sink_map(Keyword.update(acc, src_port_name, [send_fn], senders ~> [send_fn|senders]))
-      :run ->
-        acc
-    after 3000 ->
-        raise "subscribe much?!"
-    end
-  end
-
-  defp make_emitter(sinks) do
-    %Emitter{emit: value ~> each(sinks, &(&1.(value)))}
-  end
-
-  defp validate_type(value, type) do
-    :ok # TODO: implement
   end
 end
