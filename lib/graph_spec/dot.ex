@@ -74,13 +74,14 @@ defmodule GraphSpec.Dot do
     IO.puts(f, "#{src_id} -> #{dst_id} #{style}")
   end
 
-  def format_type(%GenericType{name: name, argument: arg}) do
-    "#{format_type(name)}.of(#{format_type(arg)})"
+  def format_type(%GenericType{template: template, argument: arg}) do
+    "#{format_type(template.name)}.of(#{format_type(arg)})"
   end
 
-  def format_type(%StructType{name: name}) do
-    format_type(name)
-  end
+  # def format_type(%StructType{name: name}) do
+  #   format_type(name)
+  # end
+
   
   def format_type(%BasicType{name: name}) do
     format_type(name)

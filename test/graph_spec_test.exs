@@ -1,6 +1,6 @@
 defmodule GraphSpecTest do
   use ExUnit.Case
-  use Types
+  #use Types
   import GraphSpec
   
   defnode a(i: String, outputs: [o: String]) do

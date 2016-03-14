@@ -2,9 +2,13 @@ defmodule FlowTest do
   use ExUnit.Case
   import GraphSpec
   import Flow, only: [emit: 2]
+  import TestUtil
+
+  setup do
+    Types.define_all
+  end
   
   defnode adder(a: Number, b: Number, outputs: [sum: Number]) do
-    IO.puts "in adder, a = #{a}, b = #{b}"
     emit(sum, a + b)
   end
 
@@ -53,10 +57,25 @@ defmodule FlowTest do
     end)
 
   test "graph flow 2" do
-    # GraphSpec.Dot.render_dot(multi2, "graph")
+    #GraphSpec.Dot.render_dot(multi2, "graph")
     [values: [o: result, z: z]] = Flow.run(multi2, args: [a: 1, b: 2, c: 3, d: 10])
     assert result == 39
     assert z == 30
   end
+
+  test "bad input types" do
+    assert_error(Flow.run(adder, args: [a: 1, b: "two"]),
+                 "oops")
+  end
   
+  defnode bad_adder(a: Number, b: Number, outputs: [sum: Number]) do
+    emit(sum, "a + b")
+  end
+
+  test "bad output types" do
+    assert_error(Flow.run(bad_adder, args: [a: 1, b: 2]),
+                 "Expected sum to be a Number but got \"a + b\"")
+  end
+  
+
 end

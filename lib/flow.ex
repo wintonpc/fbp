@@ -52,12 +52,12 @@ defmodule Flow do
   defp receive_values(expected), do: receive_values([], Keyword.keys(expected), expected)
   defp receive_values(acc, [], expected), do: reorder(acc, Keyword.keys(expected), {name, _} ~> name)
   defp receive_values(acc, remaining, expected) do
-    IO.puts "receiving values..."
+    #IO.puts "receiving values..."
     receive do
       {:value, name, value} ->
-        IO.puts "received #{inspect({name, value})}"
+        #IO.puts "received #{inspect({name, value})}"
         type = expected[name]
-        validate_type(value, type)
+        validate_type(name, value, type)
         new_remaining = remaining -- [name]
         if new_remaining == remaining do
           raise "unexpected value #{name}!"
@@ -66,8 +66,10 @@ defmodule Flow do
     end
   end
 
-  defp validate_type(value, type) do
-    :ok # TODO: implement
+  defp validate_type(port_name, value, type) do
+    unless Type.is_type(type, value) do
+      raise "Expected #{port_name} to be a #{String.replace(to_string(type.name), "Elixir.", "")} but got #{inspect(value)}"
+    end
   end
   
   # node process code

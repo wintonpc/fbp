@@ -13,9 +13,15 @@ defmodule GraphSpec do
     nodes = opts[:nodes] || []
     connections = opts[:connections] || []
     node_insts = instantiate_nodes(nodes)
-    g = %GraphSpec{type: type, nodes: node_insts, edges: connections, inputs: inputs, outputs: outputs}
+    g = %GraphSpec{type: type, nodes: node_insts, edges: connections,
+                   inputs: reify_types(inputs),
+                   outputs: reify_types(outputs)}
     GraphSpec.Validation.validate(g)
     g
+  end
+
+  def reify_types(port_specs) do
+    map(port_specs, {name, type} ~> {name, Type.get_type(type)})
   end
 
   defp id_for_name(name, nodes) do

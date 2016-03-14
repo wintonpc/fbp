@@ -1,91 +1,119 @@
+defmodule Array do
+  def of(item_type) do
+    Type.instantiate_generic(Array, item_type)
+  end
+end
+
+defmodule Foo do
+  def of(item_type) do
+    Type.instantiate_generic(Foo, item_type)
+  end
+end
+
+import Hacks
+defstruct2 MyRange, [a, b]
+
 defmodule Type.Test do
   use ExUnit.Case
-  import Type, except: [get_type: 1]
+  import Hacks
+  import Type, only: :macros
 
-  defmodule Types do
-    use Type
-    deftype_basic String
-    deftype_basic CompoundName, extends: String
-    deftype_generic Array.of(T)
-    deftype_generic Foo.of(T)
-    deftype_struct MyRange, fields: [:a, :b]
-    deftype_struct RangeWithInc, extends: MyRange, fields: [:inc]
-  end
-
-  test "deftype" do
-    import Types, only: [get_type: 1]
-    assert get_type(String) ==
-      %BasicType{name: String, parent: get_type(Any)}
-    assert get_type(CompoundName) ==
-      %BasicType{name: CompoundName, parent: get_type(String)}
-    assert Types.Array.of(String) ==
-      %GenericType{name: Array, parameter: T, argument: get_type(String), parent: get_type(Any)}
-    assert get_type(MyRange) ==
-      %StructType{name: MyRange, fields: [:a, :b], parent: get_type(Any)}
-    assert get_type(RangeWithInc) ==
-      %StructType{name: RangeWithInc, fields: [:a, :b, :inc], parent: get_type(MyRange)}    
-  end
-
-  defmodule TestStructCreation do
-    use Types
-    
-    def go do
-      %RangeWithInc{a: 1, b: 2, inc: 0.1} # compilation will fail here unless the struct type Types.RangeWithInc
-      # exists and is aliased into this module
-    end
-  end
-
-  defmodule TestGenericCreation do
-    use Types
-
-    def go do
-      Array.of(String)
-    end
-  end
-
-  test "generic creation" do
-    TestGenericCreation.go
-  end
-
-  test "is_alias" do
-    assert is_alias(:foo) == false
-    assert is_alias(Foo) == true
-  end
-
-  test "get_type" do
-    import Types, only: [get_type: 1]
-    assert get_type(String) == %BasicType{name: String, parent: get_type(Any)}
+  setup do
+    Type.Store.clear(Type.Store.singleton)
+    :ok
   end
   
+  test "normal store" do
+    ts = Type.Store.new
+    r = Type.get_type(Any, store: ts)
+    assert %AnyType{name: Any} = r
+  end
+  
+  test "singleton store" do
+    r = Type.get_type(Any)
+    assert %AnyType{name: Any} = r
+  end
+
+  test "any type" do
+    assert Type.is_type(Any, "foo") == true
+    assert Type.is_type(Any, 42) == true
+    assert Type.is_type(Any, false) == true
+  end
+
+  test "default predicate is always false" do
+    Type.define_basic String
+    assert Type.is_type(String, "foo") == false
+    assert Type.is_type(String, 42) == false
+  end
+
+  test "basic type" do
+    Type.define_basic String, predicate: &Kernel.is_bitstring/1
+    assert Type.is_type(String, "foo") == true
+    assert Type.is_type(String, :foo) == false
+    assert Type.is_type(String, 42) == false
+  end
+
+  test "basic inheritance" do
+    Type.define_basic String, predicate: &Kernel.is_bitstring/1
+    Type.define_basic ShortString, extends: String, predicate: &(String.length(&1) <= 3)
+    assert Type.is_type(String, "foo") == true
+    assert Type.is_type(ShortString, "foo") == true
+    assert Type.is_type(ShortString, "food") == false
+    assert Type.is_type(ShortString, :non_string) == false
+  end
+
+  test "structs" do
+    Type.define_struct %MyRange{}
+    assert Type.is_type(MyRange, %MyRange{}) == true
+    assert Type.is_type(MyRange, %MyRange{a: 1, b: 2}) == true
+    assert Type.is_type(MyRange, %{a: 1, b: 2}) == false
+    assert Type.is_type(MyRange, "range!") == false
+  end
+
   test "get_type is idempotent" do
-    import Types, only: [get_type: 1]
-    type = get_type(String)
-    assert type  == %BasicType{name: String, parent: get_type(Any)}
-    assert get_type(type) == type
-  end
-  
-  test "is_assignable_from" do
-    assert assignable?(Any, String) == true
-    assert assignable?(String, Any) == false
-    assert assignable?(Any, Any) == true
-    assert assignable?(String, String) == true
-    assert assignable?(Any, CompoundName) == true
-    assert assignable?(String, CompoundName) == true
-    assert assignable?(CompoundName, Any) == false
-    assert assignable?(CompoundName, String) == false
-    assert assignable?(Any, Types.Array.of(String)) == true
-    assert assignable?(Types.Array.of(String), Any) == false
+    any = Type.get_type(Any)
+    assert %AnyType{} = any
+    assert Type.get_type(any) == any
   end
 
-  def assignable?(binding_type_name, value_type_name) do
-    Type.is_assignable_from(Types.get_type(binding_type_name),
-                            Types.get_type(value_type_name))
+  test "is_type works with both types and type names" do
+    Type.define_basic String, predicate: &Kernel.is_bitstring/1
+    assert Type.is_type(String, "foo")
+    assert Type.is_type(Type.get_type(String), "foo")
+  end
+
+  test "is_assignable_from" do
+    Type.define_basic String, predicate: &Kernel.is_bitstring/1
+    Type.define_basic CompoundName, extends: String
+    Type.define_generic Array, T, predicate: &Kernel.is_list/1
+    
+    assert Type.is_assignable_from(Any, String) == true
+    assert Type.is_assignable_from(String, Any) == false
+    assert Type.is_assignable_from(Any, Any) == true
+    assert Type.is_assignable_from(String, String) == true
+    assert Type.is_assignable_from(Any, CompoundName) == true
+    assert Type.is_assignable_from(String, CompoundName) == true
+    assert Type.is_assignable_from(CompoundName, Any) == false
+    assert Type.is_assignable_from(CompoundName, String) == false
+    assert Type.is_assignable_from(Any, Array.of(String)) == true
+    assert Type.is_assignable_from(Array.of(String), Any) == false
   end
 
   test "generics are covariant" do
-    alias Types.Array, as: Array
-    assert assignable?(Array.of(String), Array.of(CompoundName)) == true
-    assert assignable?(Array.of(CompoundName), Array.of(String)) == false
-    assert assignable?(Array.of(String), Types.Foo.of(String)) == false
+    Type.define_basic String
+    Type.define_basic CompoundName, extends: String
+    Type.define_generic Array, T
+    Type.define_generic Foo, T
+
+    assert Type.is_assignable_from(Array.of(String), Array.of(CompoundName)) == true
+    assert Type.is_assignable_from(Array.of(CompoundName), Array.of(String)) == false
+    assert Type.is_assignable_from(Array.of(String), Foo.of(String)) == false
   end
+  
+  def assert_match(actual_struct, expected_struct) do
+    actual_map = Map.from_struct(actual_struct)
+    expected_map = Map.from_struct(expected_struct)
+    Enum.all?(expected_map, {ek, ev} ~> (actual_map[ek] == ev)) || raise "did not match:\n  #{inspect(actual_struct)}\n  #{inspect(expected_struct)}"
+  end
+
 end

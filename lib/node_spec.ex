@@ -4,7 +4,7 @@ defmodule NodeSpec do
   def make(type, f, opts \\ []) do
     inputs = opts[:inputs] || []
     outputs = opts[:outputs] || []
-    n = %NodeSpec{type: type, inputs: inputs, outputs: outputs, f: f}
+    n = %NodeSpec{type: type, inputs: GraphSpec.reify_types(inputs), outputs: GraphSpec.reify_types(outputs), f: f}
     GraphSpec.Validation.validate(n)
     n
   end

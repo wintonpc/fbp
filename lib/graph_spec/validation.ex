@@ -54,7 +54,7 @@ defmodule GraphSpec.Validation do
     each g.edges, fn {{sn, sp} = src, {dn, dp} = dst} ->
       src_type = find_matching_port(sources, sn, sp)
       dst_type = find_matching_port(sinks, dn, dp)
-      unless Type.is_assignable_from(Types.get_type(dst_type), Types.get_type(src_type)) do # TODO: fix hard dependency on Types
+      unless Type.is_assignable_from(Type.get_type(dst_type), Type.get_type(src_type)) do # TODO: fix hard dependency on Types
         raise "Error: #{format_port(src)} (#{GraphSpec.Dot.format_type(src_type)}) " <> # TODO: fix dependency on GraphSpec.Dot
           "cannot flow to #{format_port(dst)} (#{GraphSpec.Dot.format_type(dst_type)})"
       end

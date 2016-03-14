@@ -1,17 +1,10 @@
 defmodule GraphSpec.ValidationTest do
   use ExUnit.Case
-  use Types
   import GraphSpec, only: :macros
+  import TestUtil
   
-  defmacro assert_error(exp, msg) do
-    quote do
-      case catch_error(unquote(exp)) do
-        %RuntimeError{message: m} ->
-          assert m == unquote(msg)
-        x ->
-          flunk "Unexpected return value: #{inspect(x)}"
-      end
-    end
+  setup do
+    Types.define_all
   end
   
   test "unique port names" do
@@ -165,10 +158,6 @@ defmodule GraphSpec.ValidationTest do
       "Error: the graph has a cycle: x -> y -> z -> x")
   end
 
-  test "known port types" do
-    # TODO
-  end
-
   test "all_ports" do
     result =
       GraphSpec.Validation.all_ports(
@@ -180,10 +169,10 @@ defmodule GraphSpec.ValidationTest do
                      this.i -> a.i
                      a.o -> this.o
                    end))
-    {[%GraphSpec.Validation.Port{name: :i, node: nil, type: String},
-      %GraphSpec.Validation.Port{name: :o, node: the_node1, type: Number}],
-     [%GraphSpec.Validation.Port{name: :o, node: nil, type: Number},
-      %GraphSpec.Validation.Port{name: :i, node: the_node2, type: String}]} = result
+    {[%GraphSpec.Validation.Port{name: :i, node: nil, type: %BasicType{name: String}},
+      %GraphSpec.Validation.Port{name: :o, node: the_node1, type: %BasicType{name: Number}}],
+     [%GraphSpec.Validation.Port{name: :o, node: nil, type: %BasicType{name: Number}},
+      %GraphSpec.Validation.Port{name: :i, node: the_node2, type: %BasicType{name: String}}]} = result
     assert the_node1 == the_node2
     assert %GraphSpec.NodeInst{name: a} = the_node1
   end
