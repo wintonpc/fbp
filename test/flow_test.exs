@@ -87,4 +87,25 @@ defmodule FlowTest do
     [values: [sum: 3]] = Flow.run(bad_adder2, args: [a: 1, b: 2])
   end
 
+
+  defnode add2(a: Number, b: Number, outputs: [sum: Number]) do
+    emit(sum, a + b)
+  end
+
+  defgraph add3(inputs: [a: Number, b: Number, c: Number],
+                outputs: [sum: Number],
+                nodes: [x: add2, y: add2],
+                connections: edges do
+                  this.a -> x.a
+                  this.b -> x.b
+                  x.sum -> y.a
+                  this.c -> y.b
+                  y.sum -> this.sum
+                end)
+  
+  test "readme" do
+    GraphSpec.Dot.render_dot(add2, "add2")
+    GraphSpec.Dot.render_dot(add3, "add3")
+  end
+    
 end

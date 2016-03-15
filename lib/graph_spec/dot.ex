@@ -44,18 +44,18 @@ defmodule GraphSpec.Dot do
       connect(f, id, src_node, src, dst, node_name_to_id)
     end
     IO.puts(f, "}")
-    if name == nil do # outermost graph
+    if depth == 1 do
       write_external_connections(f, id, g, node_name_to_id, gen)
     end
   end
 
-  defp write_external_connections(f, id, g, node_name_to_id, gen) do
-    each g.inputs, fn {port_name, type} ->
+  defp write_external_connections(f, id, spec, node_name_to_id, gen) do
+    each spec.inputs, fn {port_name, type} ->
       n = Incrementor.next(gen)
       IO.puts(f, "#{n} [label=\"#{format_type(type)}\", shape=plaintext, fontsize=8]")
       IO.puts(f, "#{n} -> #{port(id, {nil, port_name}, node_name_to_id)}")
     end
-    each g.outputs, fn {port_name, type} ->
+    each spec.outputs, fn {port_name, type} ->
       n = Incrementor.next(gen)
       IO.puts(f, "#{n} [label=\"#{format_type(type)}\", shape=plaintext, fontsize=8]")
       IO.puts(f, "#{port(id, {nil, port_name}, node_name_to_id)} -> #{n}")
@@ -100,7 +100,7 @@ defmodule GraphSpec.Dot do
     "port_#{node_name_to_id[node_name]}_#{port_name}"
   end
 
-  defp write(f, id, name, %NodeSpec{} = node, gen, _) do
+  defp write(f, id, name, %NodeSpec{} = node, gen, depth) do
     IO.puts(f, "subgraph cluster_#{id} {")
     IO.puts(f, "bgcolor=lightskyblue1")
     IO.puts(f, "label=\"\"")
@@ -109,7 +109,10 @@ defmodule GraphSpec.Dot do
     write_port_group(f, id, node.outputs, gen)
     connect_input_ports(f, id, node)
     connect_output_ports(f, id, node)
-    IO.puts(f, "}")    
+    IO.puts(f, "}")
+    if depth == 1 do
+      write_external_connections(f, id, node, %{name => id}, gen)
+    end
   end
 
   defp connect_input_ports(f, id, node) do
