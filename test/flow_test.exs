@@ -65,7 +65,7 @@ defmodule FlowTest do
 
   test "bad input types" do
     assert_error(Flow.run(adder, args: [a: 1, b: "two"]),
-                 "oops")
+                 "Expected \"b\" to be a Number but got \"two\"")
   end
   
   defnode bad_adder(a: Number, b: Number, outputs: [sum: Number]) do
@@ -74,8 +74,17 @@ defmodule FlowTest do
 
   test "bad output types" do
     assert_error(Flow.run(bad_adder, args: [a: 1, b: 2]),
-                 "Expected sum to be a Number but got \"a + b\"")
+                 "Expected \"sum\" to be a Number but got \"a + b\"")
   end
-  
+
+  defnode bad_adder2(a: Number, b: Number, outputs: [sum: Number]) do
+    emit(sum, a + b)
+    raise "oops"
+  end
+
+  test "error after everything emitted" do
+    # doesn't affect downstream nodes
+    [values: [sum: 3]] = Flow.run(bad_adder2, args: [a: 1, b: 2])
+  end
 
 end

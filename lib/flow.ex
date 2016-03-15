@@ -63,12 +63,14 @@ defmodule Flow do
           raise "unexpected value #{name}!"
         end
         receive_values([{name, value}|acc], new_remaining, expected)
+      {:DOWN, _, _, _, {exception, stacktrace}} = msg ->
+        reraise exception, stacktrace
     end
   end
 
   defp validate_type(port_name, value, type) do
     unless Type.is_type(type, value) do
-      raise "Expected #{port_name} to be a #{String.replace(to_string(type.name), "Elixir.", "")} but got #{inspect(value)}"
+      raise "Expected \"#{port_name}\" to be a #{String.replace(to_string(type.name), "Elixir.", "")} but got #{inspect(value)}"
     end
   end
   
@@ -101,10 +103,14 @@ defmodule Flow do
   end
 
   defp wire(%NodeSpec{inputs: inputs} = spec) do
-    node_pid = spawn_link(thunk(run_node(spec)))
+    node_pid = spawn(thunk(run_node(spec)))
+    subscribe_fn = fn {out_port_name, send_fn} ->
+      Process.monitor(node_pid)
+      send_subscription(node_pid, out_port_name, send_fn)
+    end
     %WiredNode{spec: spec,
                send_fns: map(in_port_names(spec), name ~> {name, make_sender(node_pid, name)}),
-               subscribe_fn: {out_port_name, send_fn} ~> send_subscription(node_pid, out_port_name, send_fn),
+               subscribe_fn: subscribe_fn,
                run_fn: thunk(send_run(node_pid))}
   end
 
