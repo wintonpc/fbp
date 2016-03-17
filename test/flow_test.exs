@@ -87,6 +87,15 @@ defmodule FlowTest do
     [values: [sum: 3]] = Flow.run(bad_adder2, args: [a: 1, b: 2])
   end
 
+  defnode pow(base: Number, exp: Number, outputs: [r: Number]) do
+    :timer.sleep(1000)
+    emit(r, :math.pow(base, exp))
+  end
+
+  test "single pow" do
+    [values: [r: r]] = Flow.run(pow, args: [base: 2, exp: 3])
+    assert r == 8.0
+  end
 
   # defnode add2(a: Number, b: Number, outputs: [sum: Number]) do
   #   emit(sum, a + b)
