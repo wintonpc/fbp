@@ -127,7 +127,10 @@ defmodule GraphSpec do
   
   defmacro defnode({name, _, [kws]}, [do: body]) do
     {[outputs: outputs], inputs} = Enum.partition(kws, fn {k, _} -> k == :outputs end)
-    params = Enum.map(Enum.concat(inputs, outputs), &{elem(&1, 0), [], nil})
+    params = concat(inputs, outputs)
+    |> map(&elem(&1, 0))
+    |> concat([:env])
+    |> map(&{&1, [], nil})
     quote do
       def unquote({name, [], nil}) do
         GraphSpec.make_node(unquote(name), fn unquote_splicing(params) -> unquote(body) end,

@@ -31,10 +31,10 @@ defmodule Flow do
   #   - send_fn receives a value and provides it to a sink port
   
   # spec is a NodeSpec or GraphSpec
-  def run(spec, opts) do
+  def run(spec, opts, env \\ nil) do
     args = opts[:args] || []
     validate_args(args, spec)
-    wired_node = wire(spec)
+    wired_node = wire(spec, env)
     each(args, {name, value} ~> WiredNode.send(wired_node, name, value))
     each(out_port_names(spec), &WiredNode.subscribe(wired_node, &1, make_sender(self, &1)))
     WiredNode.run(wired_node)
@@ -75,11 +75,11 @@ defmodule Flow do
   end
   
   # node process code
-  defp run_node(%NodeSpec{inputs: inputs, outputs: outputs, f: f}) do
+  defp run_node(%NodeSpec{inputs: inputs, outputs: outputs, f: f}, env) do
     sink_map = accept_sink_map
     args = Keyword.values(receive_values(inputs))
     emitters = map(outputs, {name, _} ~> make_emitter(sink_map[name]))
-    apply(f, args ++ emitters) # TODO: order according to inputs
+    apply(f, args ++ emitters ++ [env]) # TODO: order according to inputs
   end
 
   defp accept_sink_map, do: accept_sink_map([])
@@ -102,8 +102,8 @@ defmodule Flow do
     emit.(value)
   end
 
-  defp wire(%NodeSpec{inputs: inputs} = spec) do
-    node_pid = spawn(thunk(run_node(spec)))
+  defp wire(%NodeSpec{inputs: inputs} = spec, env) do
+    node_pid = spawn(thunk(run_node(spec, env)))
     subscribe_fn = fn {out_port_name, send_fn} ->
       Process.monitor(node_pid)
       send_subscription(node_pid, out_port_name, send_fn)
@@ -114,8 +114,8 @@ defmodule Flow do
                run_fn: thunk(send_run(node_pid))}
   end
 
-  defp wire(%GraphSpec{nodes: node_insts, edges: edges} = gspec) do
-    wired_nodes = map(node_insts, %GraphSpec.NodeInst{name: name, spec: spec} ~> {name, wire(spec)})
+  defp wire(%GraphSpec{nodes: node_insts, edges: edges} = gspec, env) do
+    wired_nodes = map(node_insts, %GraphSpec.NodeInst{name: name, spec: spec} ~> {name, wire(spec, env)})
 
     # subscribe the nodes to each other
     for {node_name, wn} <- wired_nodes,
