@@ -125,7 +125,7 @@ defmodule GraphSpec do
 
   def exposed_port?({node_name, _port_name}), do: node_name == nil
   
-  defmacro defnode({name, _, [kws]}, [do: body]) do
+  defmacro defnode({name, ctx, [kws]}, [do: body]) do
     {[outputs: outputs], inputs} = Enum.partition(kws, fn {k, _} -> k == :outputs end)
     params = concat(inputs, outputs)
     |> map(&elem(&1, 0))
@@ -133,10 +133,21 @@ defmodule GraphSpec do
     |> map(&{&1, [], nil})
     quote do
       def unquote({name, [], nil}) do
-        GraphSpec.make_node(unquote(name), fn unquote_splicing(params) -> unquote(body) end,
-        inputs: unquote(inputs),
-        outputs: unquote(outputs))
+        define_node(unquote({name, ctx, [kws]}), unquote([do: body]))
       end
+    end
+  end
+
+  defmacro define_node({name, _, [kws]}, [do: body]) do
+    {[outputs: outputs], inputs} = Enum.partition(kws, fn {k, _} -> k == :outputs end)
+    params = concat(inputs, outputs)
+    |> map(&elem(&1, 0))
+    |> concat([:env])
+    |> map(&{&1, [], nil})
+    quote do
+      GraphSpec.make_node(unquote(name), fn unquote_splicing(params) -> unquote(body) end,
+      inputs: unquote(inputs),
+      outputs: unquote(outputs))
     end
   end
 
