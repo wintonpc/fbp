@@ -97,6 +97,26 @@ defmodule FlowTest do
     assert r == 8.0
   end
 
+  defnode multi_pow(base: AsyncArray.of(Number), exp: Number, outputs: [r: AsyncArray.of(Number)]) do
+    :timer.sleep(1000)
+    emit(r, :math.pow(base, exp))
+  end
+
+  defgraph multi_pow_graph(inputs: [base: Array.of(Number), exp: Number],
+                           outputs: [r: Array.of(Number)],
+                           nodes: [mp: multi_pow],
+                           connections: edges do
+                             this.base -> mp.base
+                             this.exp -> mp.exp
+                             mp.r -> this.r
+                           end)
+  
+  test "multiple pow" do
+    GraphSpec.Dot.render_dot(multi_pow_graph, "mpg")
+    # [values: [r: r]] = Flow.run(multi_pow_graph, args: [base: 2, exp: 3])
+    # assert r == 8.0
+  end
+
   # defnode add2(a: Number, b: Number, outputs: [sum: Number]) do
   #   emit(sum, a + b)
   # end

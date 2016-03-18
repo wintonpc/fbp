@@ -70,7 +70,8 @@ defmodule Flow do
 
   defp validate_type(port_name, value, type) do
     unless Type.is_type(type, value) do
-      raise "Expected \"#{port_name}\" to be a #{String.replace(to_string(type.name), "Elixir.", "")} but got #{inspect(value)}"
+      raise "Expected \"#{port_name}\" to be a #{String.replace(to_string(type.name), "Elixir.", "")} " <>
+        "but got #{inspect(value)}"
     end
   end
   

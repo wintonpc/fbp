@@ -1,6 +1,6 @@
-defmodule Array do
+defmodule TestArray do
   def of(item_type) do
-    Type.instantiate_generic(Array, item_type)
+    Type.instantiate_generic(TestArray, item_type)
   end
 end
 
@@ -85,7 +85,7 @@ defmodule Type.Test do
   test "is_assignable_from" do
     Type.define_basic String, predicate: &Kernel.is_bitstring/1
     Type.define_basic CompoundName, extends: String
-    Type.define_generic Array, T, predicate: &Kernel.is_list/1
+    Type.define_generic TestArray, T, predicate: &Kernel.is_list/1
     
     assert Type.is_assignable_from(Any, String) == true
     assert Type.is_assignable_from(String, Any) == false
@@ -95,19 +95,19 @@ defmodule Type.Test do
     assert Type.is_assignable_from(String, CompoundName) == true
     assert Type.is_assignable_from(CompoundName, Any) == false
     assert Type.is_assignable_from(CompoundName, String) == false
-    assert Type.is_assignable_from(Any, Array.of(String)) == true
-    assert Type.is_assignable_from(Array.of(String), Any) == false
+    assert Type.is_assignable_from(Any, TestArray.of(String)) == true
+    assert Type.is_assignable_from(TestArray.of(String), Any) == false
   end
 
   test "generics are covariant" do
     Type.define_basic String
     Type.define_basic CompoundName, extends: String
-    Type.define_generic Array, T
+    Type.define_generic TestArray, T
     Type.define_generic Foo, T
 
-    assert Type.is_assignable_from(Array.of(String), Array.of(CompoundName)) == true
-    assert Type.is_assignable_from(Array.of(CompoundName), Array.of(String)) == false
-    assert Type.is_assignable_from(Array.of(String), Foo.of(String)) == false
+    assert Type.is_assignable_from(TestArray.of(String), TestArray.of(CompoundName)) == true
+    assert Type.is_assignable_from(TestArray.of(CompoundName), TestArray.of(String)) == false
+    assert Type.is_assignable_from(TestArray.of(String), Foo.of(String)) == false
   end
   
   def assert_match(actual_struct, expected_struct) do
