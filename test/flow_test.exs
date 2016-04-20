@@ -104,37 +104,41 @@ defmodule FlowTest do
 
   defgraph multi_pow_graph(inputs: [base: Array.of(Number), exp: Number],
                            outputs: [r: Array.of(Number)],
-                           nodes: [mp: multi_pow],
+                           nodes: [mp: multi_pow,
+                                   c1: BuiltIn.to_async(Number),
+                                   c2: BuiltIn.from_async(Number)],
                            connections: edges do
-                             this.base -> mp.base
+                             this.base -> c1.i
+                             c1.o -> mp.base
                              this.exp -> mp.exp
-                             mp.r -> this.r
+                             mp.r -> c2.i
+                             c2.o -> this.r
                            end)
   
   test "multiple pow" do
-    GraphSpec.Dot.render_dot(multi_pow_graph, "mpg")
+    #GraphSpec.Dot.render_dot(multi_pow_graph, "mpg")
     # [values: [r: r]] = Flow.run(multi_pow_graph, args: [base: 2, exp: 3])
     # assert r == 8.0
   end
 
-  # defnode add2(a: Number, b: Number, outputs: [sum: Number]) do
-  #   emit(sum, a + b)
-  # end
+  defnode add2(a: Number, b: Number, outputs: [sum: Number]) do
+    emit(sum, a + b)
+  end
 
-  # defgraph add3(inputs: [a: Number, b: Number, c: Number],
-  #               outputs: [sum: Number],
-  #               nodes: [x: add2, y: add2],
-  #               connections: edges do
-  #                 this.a -> x.a
-  #                 this.b -> x.b
-  #                 x.sum -> y.a
-  #                 this.c -> y.b
-  #                 y.sum -> this.sum
-  #               end)
+  defgraph add3(inputs: [a: Number, b: Number, c: Number],
+                outputs: [sum: Number],
+                nodes: [x: add2, y: add2],
+                connections: edges do
+                  this.a -> x.a
+                  this.b -> x.b
+                  x.sum -> y.a
+                  this.c -> y.b
+                  y.sum -> this.sum
+                end)
   
-  # test "readme" do
-  #   GraphSpec.Dot.render_dot(add2, "add2")
-  #   GraphSpec.Dot.render_dot(add3, "add3")
-  # end
+  test "readme" do
+    GraphSpec.Dot.render_dot(add2, "add2")
+    #GraphSpec.Dot.render_dot(add3, "add3")
+  end
     
 end

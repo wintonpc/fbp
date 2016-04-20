@@ -103,6 +103,10 @@ defmodule Flow do
     emit.(value)
   end
 
+  def pop(async_array) do
+    
+  end
+
   defp wire(%NodeSpec{inputs: inputs} = spec, env) do
     node_pid = spawn(thunk(run_node(spec, env)))
     subscribe_fn = fn {out_port_name, send_fn} ->
